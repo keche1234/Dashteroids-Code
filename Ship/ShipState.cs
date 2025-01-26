@@ -6,6 +6,7 @@ public class ShipState : MonoBehaviour
     public int startingLives;
     public float respawnDelay;
     public float respawnInvinicibilityTime;
+    public float burstInvincibilityTime;
 
     private int currentLives;
     private float respawnTimer;
@@ -18,8 +19,8 @@ public class ShipState : MonoBehaviour
 
     //[Header("Bursting")]
     private bool bursting;
-    private float burstActiveTime = 0.5f; // paranoia: burst should deactivate upon hitting asteroid.
-    private float burstTimer = 0f; // paranoia: burst should deactivate upon hitting asteroid.
+    private float burstActiveTime = 1f; // paranoia: burst should end upon contacting asteroid
+    private float burstTimer = 0f; // paranoia: brust should end upon contacting asteroid
 
     private SpriteRenderer sprite;
 
@@ -68,10 +69,10 @@ public class ShipState : MonoBehaviour
         }
         else
         {
-            Debug.Log("Invinc Timer: " + invincTimer);
+            //Debug.Log("Invinc Timer: " + invincTimer);
             if (!alive)
             {
-                if (respawnTimer > 0)
+                if (respawnTimer <= 0)
                 {
                     alive = true;
                     shipControl.enabled = true;
@@ -111,16 +112,19 @@ public class ShipState : MonoBehaviour
 
         if ((target = collision.gameObject) && (asteroid = target.GetComponent<Asteroid>()))
         {
-            Debug.Log("Found asteroid " + target);
             if (alive)
             {
+                Vector2 normal = (transform.position - target.transform.position).normalized;
                 if (IsBursting())
                 {
-                    Vector2 normal = (transform.position - target.transform.position).normalized;
                     asteroid.BreakAsteroid(normal);
+                    StartDash(shipControl.GetComboDuration());
+                    invincTimer = burstInvincibilityTime;
                     bursting = false;
                 }
-                else if (invincTimer <= 0)
+                else if (invincTimer > 0)
+                    asteroid.BreakAsteroid(normal);
+                else
                     Explode();
             }
         }
@@ -135,6 +139,10 @@ public class ShipState : MonoBehaviour
         sprite.enabled = false;
         currentLives--;
 
+        // Start respawn
+        respawnTimer = respawnDelay;
+
+        // Reset dash stats
         dashTimer = 0;
         bursting = false;
     }
@@ -159,6 +167,7 @@ public class ShipState : MonoBehaviour
     {
         bursting = true;
         burstTimer = burstActiveTime;
+        invincTimer = burstInvincibilityTime;
     }
 
     public bool IsDashing()
