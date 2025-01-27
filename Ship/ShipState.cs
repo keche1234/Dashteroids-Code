@@ -3,10 +3,11 @@ using UnityEngine;
 public class ShipState : MonoBehaviour
 {
     [Header("Lives")]
-    public int startingLives;
-    public float respawnDelay;
-    public float respawnInvinicibilityTime;
-    public float burstInvincibilityTime;
+    [SerializeField] protected int startingLives;
+    [SerializeField] protected float respawnDelay;
+    [SerializeField] protected float respawnInvinicibilityTime;
+    [SerializeField] protected float burstInvincibilityTime;
+    [SerializeField] protected LifeUI lifeCounter;
 
     private int currentLives;
     private float respawnTimer;
@@ -14,8 +15,18 @@ public class ShipState : MonoBehaviour
 
     private bool alive = true;
 
-    //[Header("Dashing")]
-    private float dashTimer;
+    [Header("Dashing")]
+    [SerializeField] protected float trailRate; // combo trail is rendered with time = dashTimer * trailRate
+    [SerializeField] protected float trailDecay; //rate of decay of the time on the combo trail
+    protected int scoreMultiplier = 1;
+    protected TrailRenderer comboTrail;
+    protected float dashTimer;
+    protected Rigidbody2D playerRb;
+
+    [Header("Scoring")]
+    [Tooltip("Points per units travelled while dashing")]
+    [SerializeField] protected float dashPoints;
+    [SerializeField] protected ScoreManager scoreManager;
 
     //[Header("Bursting")]
     private bool bursting;
@@ -35,6 +46,12 @@ public class ShipState : MonoBehaviour
 
         shipControl = GetComponent<ShipController>();
         sprite = GetComponent<SpriteRenderer>();
+
+        comboTrail = GetComponent<TrailRenderer>();
+        comboTrail.time = 0.0f;
+        comboTrail.emitting = false;
+
+        playerRb = GetComponent<Rigidbody2D>();
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -85,6 +102,8 @@ public class ShipState : MonoBehaviour
                     transform.rotation = Quaternion.LookRotation(transform.forward, Vector3.up);
                     GetComponent<Rigidbody2D>().linearVelocity = Vector3.zero;
                     GetComponent<Rigidbody2D>().angularVelocity = 0f;
+
+                    comboTrail.emitting = true;
                 }
                 else
                     respawnTimer -= Time.deltaTime;
@@ -101,8 +120,27 @@ public class ShipState : MonoBehaviour
 
     public void DashUpdate()
     {
-        dashTimer -= Time.deltaTime;
-        dashTimer = Mathf.Clamp(dashTimer, 0, dashTimer);
+        if (dashTimer > 0)
+        {
+            // Add Score
+            scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+
+            dashTimer -= Time.deltaTime;
+            comboTrail.time = Mathf.Clamp(comboTrail.time + (trailRate * Time.deltaTime), 0.0f, dashTimer * trailRate);
+
+            if (dashTimer <= 0.0f)
+            {
+                invincTimer = 0.5f;
+                dashTimer = 0.0f;
+                comboTrail.emitting = false;
+                scoreManager.ResetMultiplier();
+            }
+        }
+        else
+        {
+            comboTrail.time = 0.0f;
+            comboTrail.emitting = false;
+        }
     }
 
     public void OnTriggerEnter2D(Collider2D collision)
@@ -118,11 +156,15 @@ public class ShipState : MonoBehaviour
                 if (IsBursting())
                 {
                     asteroid.BreakAsteroid(normal);
+
+                    scoreManager.AddScore(asteroid.GetScoreValue(), false);
+                    scoreManager.IncrementMultiplier();
+
                     StartDash(shipControl.GetComboDuration());
                     invincTimer = burstInvincibilityTime;
                     bursting = false;
                 }
-                else if (invincTimer > 0)
+                else if (invincTimer > 0 || !asteroid.CanDestroyPlayer())
                     asteroid.BreakAsteroid(normal);
                 else
                     Explode();
@@ -145,6 +187,16 @@ public class ShipState : MonoBehaviour
         // Reset dash stats
         dashTimer = 0;
         bursting = false;
+
+        // Stop combo Trail
+        comboTrail.emitting = false;
+        comboTrail.time = 0;
+
+        // Update life counter
+        lifeCounter.SetLifeCount(currentLives);
+
+        // Update Score Multiplier
+        scoreManager.ResetMultiplier();
     }
 
     public bool IsAlive()
@@ -158,6 +210,8 @@ public class ShipState : MonoBehaviour
     public void StartDash(float t)
     {
         dashTimer = t;
+        comboTrail.emitting = true;
+        comboTrail.time = trailRate;
     }
 
     /*

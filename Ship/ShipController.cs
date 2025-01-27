@@ -29,7 +29,7 @@ public class ShipController : MonoBehaviour
     [SerializeField] private float burstCooldown;
     [SerializeField] private float maxBurstBonus;
     private float burstCooldownTimer = 0.0f;
-    private float burstSpeedGrowth = 1.1f;
+    private float burstSpeedGrowth = 1.5f;
     private float burstingSpeed; // based on dash speed
     private float burstBonus;
 
@@ -80,15 +80,17 @@ public class ShipController : MonoBehaviour
             if (Input.GetKeyDown(chargeBtn) && burstCooldownTimer <= 0.0f)
             {
                 // Use RayCast to detect asteroid nearby for burst
-                Debug.DrawRay(transform.position - (transform.right * 0.5f), transform.up * (burstRange + 0.5f), Color.green, 0.5f);
-                Debug.DrawRay(transform.position, transform.up * (burstRange + 0.5f), Color.blue, 0.5f);
-                Debug.DrawRay(transform.position + (transform.right * 0.5f), transform.up * (burstRange + 0.5f), Color.green, 0.5f);
+                Debug.DrawRay(transform.position - (transform.right * (transform.localScale.x / 2)), transform.up * (burstRange + 0.5f), Color.green, 4f);
+                Debug.DrawRay(transform.position, transform.up * (burstRange + 0.5f), Color.blue, 4f);
+                Debug.DrawRay(transform.position + (transform.right * (transform.localScale.x / 2)), transform.up * (burstRange + 0.5f), Color.green, 4f);
                 RaycastHit2D hitInfo;
-                if (hitInfo = Physics2D.CircleCast(transform.position, 0.5f, transform.up, burstRange + 0.5f, LayerMask.GetMask("Asteroid")))
+                if (hitInfo = Physics2D.CircleCast(transform.position, (transform.localScale.x / 2), transform.up, burstRange + 0.5f, LayerMask.GetMask("Asteroid")))
                 {
-                    Debug.Log("Detected object at distance " + hitInfo.distance);
+                    // TODO: Screen Wrap Burst:
+                    // if ship has screenwrapper component and is less than burstRange from edge in any direction
+                    // start another Circlecast at wrap point
+
                     burstBonus = Mathf.Max(burstSpeedGrowth, maxBurstBonus * ((burstRange - hitInfo.distance) / burstRange));
-                    Debug.Log("Bursting with bonus " + burstBonus + "!");
                     shipState.StartBurst();
                 }
                 else
