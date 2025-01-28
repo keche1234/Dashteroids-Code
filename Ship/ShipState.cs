@@ -16,10 +16,11 @@ public class ShipState : MonoBehaviour
     private bool alive = true;
 
     [Header("Dashing")]
+    [Tooltip("Combo Trail time is set to Time Remaining on Dash * trailRate")]
     [SerializeField] protected float trailRate; // combo trail is rendered with time = dashTimer * trailRate
     [SerializeField] protected float trailDecay; //rate of decay of the time on the combo trail
+    [SerializeField] protected TrailRenderer comboTrail;
     protected int scoreMultiplier = 1;
-    protected TrailRenderer comboTrail;
     protected float dashTimer;
     protected Rigidbody2D playerRb;
 
@@ -30,7 +31,7 @@ public class ShipState : MonoBehaviour
 
     //[Header("Bursting")]
     private bool bursting;
-    private float burstActiveTime = 1f; // paranoia: burst should end upon contacting asteroid
+    private float burstActiveTime = 0.2f; // paranoia: burst should end upon contacting asteroid
     private float burstTimer = 0f; // paranoia: brust should end upon contacting asteroid
 
     private SpriteRenderer sprite;
@@ -47,7 +48,6 @@ public class ShipState : MonoBehaviour
         shipControl = GetComponent<ShipController>();
         sprite = GetComponent<SpriteRenderer>();
 
-        comboTrail = GetComponent<TrailRenderer>();
         comboTrail.time = 0.0f;
         comboTrail.emitting = false;
 
@@ -127,6 +127,7 @@ public class ShipState : MonoBehaviour
 
             dashTimer -= Time.deltaTime;
             comboTrail.time = Mathf.Clamp(comboTrail.time + (trailRate * Time.deltaTime), 0.0f, dashTimer * trailRate);
+            comboTrail.emitting = true;
 
             if (dashTimer <= 0.0f)
             {
@@ -221,7 +222,7 @@ public class ShipState : MonoBehaviour
     {
         bursting = true;
         burstTimer = burstActiveTime;
-        invincTimer = burstInvincibilityTime;
+        //invincTimer = burstInvincibilityTime;
     }
 
     public bool IsDashing()

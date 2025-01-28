@@ -8,7 +8,7 @@ public class ScreenWrapper : MonoBehaviour
     private Rigidbody2D rb;
 
     //0.1 of the view size
-    public float baseMargin;
+    [SerializeField] protected float baseMargin;
 
     // TODO: Try out speed dependent wrapping?
 
@@ -33,7 +33,7 @@ public class ScreenWrapper : MonoBehaviour
         float screenWidth = Camera.main.orthographicSize * Camera.main.aspect * 2;
         float screenHeight = Camera.main.orthographicSize * 2;
 
-        //i can't assign a vector component to a transform directly so I use a temporary variable
+        //I can't assign a vector component to a transform directly so I use a temporary variable
         //even if most of the times won't be changes
         Vector2 newPosition = transform.position;
 
@@ -65,5 +65,10 @@ public class ScreenWrapper : MonoBehaviour
     public void SetBaseMargin(float bm)
     {
         baseMargin = bm;
+    }
+
+    public float GetBaseMargin()
+    {
+        return baseMargin;
     }
 }

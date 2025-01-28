@@ -21,7 +21,7 @@ public class ScoreManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        Application.targetFrameRate = 60;
     }
 
     // Update is called once per frame
@@ -32,7 +32,7 @@ public class ScoreManager : MonoBehaviour
             rollingScore += rollRateUI * Time.deltaTime;
             rollingScore = Mathf.Clamp(rollingScore, 0.0f, trueScore);
         }
-        scoreText.text = rollingScore.ToString("0000000");
+        scoreText.text = rollingScore.ToString("00000000");
     }
 
     public void AddScore(float score, bool rolling)

@@ -4,7 +4,7 @@ public class SpawnManager : MonoBehaviour
 {
     public ObjectPool asteroidPool;
     public float asteroidSpeed;
-    public int maxAsteroidSize;
+    public float maxAsteroidSize;
 
     public float spawnTime;
     private float timer = 0f;
@@ -18,7 +18,7 @@ public class SpawnManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        int size = Asteroid.GetTotalSize();
+        float size = Asteroid.GetTotalSize();
         if (size < maxAsteroidSize && timer > spawnTime * (1.0f + (0.2f * size)))
         {
             SpawnAsteroid();
@@ -34,7 +34,7 @@ public class SpawnManager : MonoBehaviour
         {
             newAsteroid.SetActive(true);
             int asteroidLevel = Random.Range(2, 4);
-            int asteroidSize = (int)Mathf.Pow(Asteroid.GetBaseSize(), asteroidLevel);
+            float asteroidSize = Asteroid.GetBaseSize() * Mathf.Pow(2.0f, asteroidLevel - 1);
 
             // Transform initialization
             float screenWidth = Camera.main.orthographicSize * Camera.main.aspect * 2;

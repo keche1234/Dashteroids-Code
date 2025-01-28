@@ -9,9 +9,9 @@ public class Asteroid : MonoBehaviour
 
     private Rigidbody2D asteroidRb;
 
-    private static int baseSize = 2;
-    private static int totalSize;
-    private static float spawnMercyTime = 3.0f; // asteroids need to be in play for this amount of time before destroying the player
+    private static float baseSize = 0.8f;
+    private static float totalSize;
+    private static float spawnMercyTime = 2.0f; // asteroids need to be in play on screen for this amount of time before destroying the player
     private static float spawnTimer = 0.0f; // how long has the asteroid been in play?
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -23,23 +23,25 @@ public class Asteroid : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (spawnTimer > 0)
+        if (spawnTimer > 0 && IsOnScreen())
             spawnTimer -= Time.deltaTime;
+        else if (!IsOnScreen())
+            spawnTimer = spawnMercyTime;
     }
 
     public void SetLevel(int s)
     {
-        totalSize -= (int)Mathf.Pow(baseSize, level);
+        totalSize -= baseSize * Mathf.Pow(2.0f, level-1);
         level = s;
-        totalSize += (int)Mathf.Pow(baseSize, level );
+        totalSize += baseSize * Mathf.Pow(2.0f, level - 1);
     }
 
-    public static int GetBaseSize()
+    public static float GetBaseSize()
     {
         return baseSize;
     }
 
-    public static int GetTotalSize()
+    public static float GetTotalSize()
     {
         return totalSize;
     }
@@ -88,6 +90,16 @@ public class Asteroid : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    public bool IsOnScreen()
+    {
+        float screenWidth = Camera.main.orthographicSize * Camera.main.aspect * 2;
+        float screenHeight = Camera.main.orthographicSize * 2;
+
+        float halfSize = Mathf.Pow(baseSize, level)/2;
+
+        return (Mathf.Abs(transform.position.x) <= (screenWidth / 2) + halfSize || Mathf.Abs(transform.position.y) <= ((screenWidth/2) + halfSize));
+    }
+
     public void EndMercyTime()
     {
         spawnTimer = 0;
@@ -100,18 +112,18 @@ public class Asteroid : MonoBehaviour
 
     public float GetScoreValue()
     {
-        return baseScore * Mathf.Pow(2.0f, level);
+        return baseScore * Mathf.Pow(2.0f, level-1);
     }
 
     public void OnEnable()
     {
-        totalSize += (int)Mathf.Pow(baseSize, level);
+        totalSize += baseSize * Mathf.Pow(2.0f, level-1);
         spawnTimer = spawnMercyTime;
     }
 
     public void OnDisable()
     {
-        totalSize -= (int) Mathf.Pow(baseSize, level);
+        totalSize -= baseSize * Mathf.Pow(2.0f, level-1);
         if (asteroidRb)
             asteroidRb.AddForce(-transform.up * asteroidRb.linearVelocity.magnitude, ForceMode2D.Impulse);
     }
