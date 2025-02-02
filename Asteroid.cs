@@ -9,7 +9,7 @@ public class Asteroid : MonoBehaviour
 
     private Rigidbody2D asteroidRb;
 
-    private static float baseSize = 0.8f;
+    private static float baseSize = 1f;
     private static float totalSize;
     private static float spawnMercyTime = 2.0f; // asteroids need to be in play on screen for this amount of time before destroying the player
     private static float spawnTimer = 0.0f; // how long has the asteroid been in play?

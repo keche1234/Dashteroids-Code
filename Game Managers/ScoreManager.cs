@@ -45,12 +45,12 @@ public class ScoreManager : MonoBehaviour
     public void IncrementMultiplier()
     {
         scoreMultiplier = Mathf.Clamp(scoreMultiplier + multiplierGrowth, 1.0f, maxMultiplier);
-        multiplierText.text = "x" + scoreMultiplier.ToString("0.0");
+        multiplierText.text = "x" + scoreMultiplier.ToString("0");
     }
 
     public void ResetMultiplier()
     {
         scoreMultiplier = 1;
-        multiplierText.text = "x1.0";
+        multiplierText.text = "x1";
     }
 }
