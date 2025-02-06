@@ -15,14 +15,18 @@ public class ShipState : MonoBehaviour
 
     private bool alive = true;
 
-    [Header("Dashing")]
+    //[Header("Dash State")]
+    protected DashState dashState = DashState.Neutral;
+    protected float superDashTimer;
+    protected float burstDashTimer;
+    protected Rigidbody2D playerRb;
+
+    [Header("Super Dash Trail")]
     [Tooltip("Combo Trail time is set to Time Remaining on Dash * trailRate")]
     [SerializeField] protected float trailRate; // combo trail is rendered with time = dashTimer * trailRate
     [SerializeField] protected float trailDecay; //rate of decay of the time on the combo trail
-    [SerializeField] protected TrailRenderer comboTrail;
+    [SerializeField] protected TrailRenderer superDashTrail;
     protected int scoreMultiplier = 1;
-    protected float dashTimer;
-    protected Rigidbody2D playerRb;
 
     [Header("Scoring")]
     [Tooltip("Points per units travelled while dashing")]
@@ -48,8 +52,8 @@ public class ShipState : MonoBehaviour
         shipControl = GetComponent<ShipController>();
         sprite = GetComponent<SpriteRenderer>();
 
-        comboTrail.time = 0.0f;
-        comboTrail.emitting = false;
+        superDashTrail.time = 0.0f;
+        superDashTrail.emitting = false;
 
         playerRb = GetComponent<Rigidbody2D>();
     }
@@ -67,13 +71,13 @@ public class ShipState : MonoBehaviour
         DashUpdate();
 
         // paranoia
-        if (bursting)
-        {
-            if (burstTimer <= 0)
-                bursting = false;
+        //if (bursting)
+        //{
+        //    if (burstTimer <= 0)
+        //        bursting = false;
 
-            burstTimer -= Time.deltaTime;
-        }
+        //    burstTimer -= Time.deltaTime;
+        //}
     }
 
     public void LifeUpdate()
@@ -103,7 +107,7 @@ public class ShipState : MonoBehaviour
                     GetComponent<Rigidbody2D>().linearVelocity = Vector3.zero;
                     GetComponent<Rigidbody2D>().angularVelocity = 0f;
 
-                    comboTrail.emitting = true;
+                    superDashTrail.emitting = true;
                 }
                 else
                     respawnTimer -= Time.deltaTime;
@@ -120,27 +124,43 @@ public class ShipState : MonoBehaviour
 
     public void DashUpdate()
     {
-        if (dashTimer > 0)
+        switch (dashState)
         {
-            // Add Score
-            scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+            case DashState.SuperDashing:
+                // Add Score
+                superDashTrail.time = Mathf.Clamp(superDashTrail.time + (trailRate * Time.deltaTime), 0.0f, superDashTimer * trailRate);
 
-            dashTimer -= Time.deltaTime;
-            comboTrail.time = Mathf.Clamp(comboTrail.time + (trailRate * Time.deltaTime), 0.0f, dashTimer * trailRate);
-            comboTrail.emitting = true;
+                if (superDashTimer > 0.0f)
+                {
+                    scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                    superDashTrail.emitting = true;
+                }
+                else
+                {
+                    dashState = DashState.Neutral;
+                    scoreManager.ResetMultiplier();
+                }
+                superDashTimer -= Time.deltaTime;
+                break;
+            case DashState.Bursting:
+                // Add Score
+                superDashTrail.time = Mathf.Clamp(superDashTrail.time + (trailRate * Time.deltaTime), 0.0f, burstDashTimer * trailRate);
 
-            if (dashTimer <= 0.0f)
-            {
-                invincTimer = 0.5f;
-                dashTimer = 0.0f;
-                comboTrail.emitting = false;
-                scoreManager.ResetMultiplier();
-            }
-        }
-        else
-        {
-            comboTrail.time = 0.0f;
-            comboTrail.emitting = false;
+                if (burstDashTimer > 0.0f)
+                {
+                    scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                    superDashTrail.emitting = true;
+                }
+                else
+                {
+                    dashState = DashState.Neutral;
+                    scoreManager.ResetMultiplier();
+                }
+
+                burstDashTimer -= Time.deltaTime;
+                break;
+            default:
+                break;
         }
     }
 
@@ -154,14 +174,14 @@ public class ShipState : MonoBehaviour
             if (alive)
             {
                 Vector2 normal = (transform.position - target.transform.position).normalized;
-                if (IsBursting())
+                if (dashState == DashState.Bursting)
                 {
                     asteroid.BreakAsteroid(normal);
 
                     scoreManager.AddScore(asteroid.GetScoreValue(), false);
                     scoreManager.IncrementMultiplier();
 
-                    StartDash(shipControl.GetComboDuration());
+                    StartSuperDash(shipControl.GetComboDuration());
                     invincTimer = burstInvincibilityTime;
                     bursting = false;
                 }
@@ -186,12 +206,12 @@ public class ShipState : MonoBehaviour
         respawnTimer = respawnDelay;
 
         // Reset dash stats
-        dashTimer = 0;
+        superDashTimer = 0;
         bursting = false;
 
         // Stop combo Trail
-        comboTrail.emitting = false;
-        comboTrail.time = 0;
+        superDashTrail.emitting = false;
+        superDashTrail.time = 0;
 
         // Update life counter
         lifeCounter.SetLifeCount(currentLives);
@@ -205,33 +225,54 @@ public class ShipState : MonoBehaviour
         return alive;
     }
 
-    /*
-     * Initiate a dash for `t` seconds.
-     */
-    public void StartDash(float t)
+    public DashState GetDashState()
     {
-        dashTimer = t;
-        comboTrail.emitting = true;
-        comboTrail.time = trailRate;
+        return dashState;
     }
 
-    /*
-     * Sets the player state to bursting
-     */
-    public void StartBurst()
+    public void SetDashState(DashState newState)
     {
-        bursting = true;
-        burstTimer = burstActiveTime;
-        //invincTimer = burstInvincibilityTime;
+        dashState = newState;
     }
 
-    public bool IsDashing()
+    /*****************************************
+     * Initiate a super dash for `t` seconds.
+     *****************************************/
+    public void StartSuperDash(float t)
     {
-        return dashTimer > 0;
+        superDashTimer = t;
+        superDashTrail.emitting = true;
+        superDashTrail.time = trailRate;
+
+        dashState = DashState.SuperDashing;
     }
 
-    public bool IsBursting()
+    /************************************
+     * Initiate a burst for `t` seconds.
+     ************************************/
+    public void StartBurstDash(float t)
     {
-        return bursting;
+        burstDashTimer = t;
+        superDashTrail.emitting = true;
+        superDashTrail.time = trailRate;
+
+        dashState = DashState.Bursting;
+    }
+
+    //public bool IsDashing()
+    //{
+    //    return dashTimer > 0;
+    //}
+
+    //public bool IsBursting()
+    //{
+    //    return bursting;
+    //}
+
+    public enum DashState
+    {
+        Neutral = 0b_001,
+        SuperDashing = 0b_010,
+        Bursting = 0b_100
     }
 }
