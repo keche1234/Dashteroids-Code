@@ -46,19 +46,16 @@ public class ShipController : MonoBehaviour
     [SerializeField] protected float comboDashDuration; // duration of a super dash off of a burst combo
     //[SerializeField] private float dashTurnStrength;
     [SerializeField] protected float superDashBaseSpeed;
-    [SerializeField] protected DashMeterUI meterUI;
+    [SerializeField] protected MeterUI meterUI;
 
     [Header("Burst Dash")]
     [SerializeField] protected float burstSpeed;
     [SerializeField] protected float burstDuration;
-    //[SerializeField] protected float burstCooldown;
-    //protected float burstCooldownTimer = 0.0f;
-    //[SerializeField] protected float maxBurstBonus;
-    //protected float burstCooldownTimer = 0.0f;
-    //protected float burstSpeedGrowth = 1.5f;
-    //protected float burstingSpeed; // based on dash speed
-    //protected float burstBonus; // increases based on how close you are when initiating burst
-    //protected float burstWrapBuffer = Mathf.Pow(Asteroid.GetBaseSize(), 3);
+    [Tooltip("When successfully parrying an asteroid, adds this value times the remaining percentage of burst as a bonus, which decays over time")]
+    [Range(0f, float.MaxValue)]
+    [SerializeField] protected float comboBoostMax;
+    protected float comboBoostEarned;
+    protected float comboBoostDecay;
 
     // Other ship scripts
     protected ShipState shipState;
@@ -110,8 +107,21 @@ public class ShipController : MonoBehaviour
                 chargeTimer = Mathf.Clamp(chargeTimer, 0, chargeDuration * 1.05f);
                 chargeProgress = chargeTimer / chargeDuration;
 
-                meterUI.gameObject.SetActive(true);
                 meterUI.SetSliderPercentage(chargeProgress);
+
+                if (dashBandCount > 1)
+                {
+                    if (chargeProgress > 1f / dashBandCount) // if charge progress exceeds 1 band
+                        meterUI.gameObject.SetActive(true);
+                    else
+                        meterUI.gameObject.SetActive(false);
+
+                }
+                else
+                {
+                    meterUI.gameObject.SetActive(true);
+                }
+
                 //Debug.Log("Charge: " + (chargeProgress / chargeDuration));
             }
             else if (Input.GetKeyUp(actionButton))
@@ -134,15 +144,12 @@ public class ShipController : MonoBehaviour
                         playerRb.AddForce(transform.up * dashStrength * counteractingDashForce, ForceMode2D.Impulse);
                         if (playerRb.linearVelocity.magnitude > dashStrength)
                             playerRb.linearVelocity = playerRb.linearVelocity.normalized * dashStrength;
-
-                        Debug.Log("Level " + bandProgress + " Dash!");
                     }
                     else
                     {
                         playerRb.AddForce(transform.up * dashStrengthBase * counteractingDashForce, ForceMode2D.Impulse);
                         if (playerRb.linearVelocity.magnitude > dashStrengthBase)
                             playerRb.linearVelocity = playerRb.linearVelocity.normalized * dashStrengthBase;
-                        Debug.Log("Dash!");
                     }
                 }
 
@@ -157,11 +164,12 @@ public class ShipController : MonoBehaviour
     {
         RotateShip();
         if (Input.GetKeyDown(actionButton))
-        {
             shipState.StartBurstDash(burstDuration);
-        }
         else
-            playerRb.linearVelocity = transform.up * superDashBaseSpeed;
+        {
+            playerRb.linearVelocity = transform.up * (superDashBaseSpeed + comboBoostEarned);
+            comboBoostEarned += comboBoostDecay * Time.deltaTime;
+        }
     }
 
     protected void RotateShip()
@@ -177,6 +185,15 @@ public class ShipController : MonoBehaviour
     public float GetComboDuration()
     {
         return comboDashDuration;
+    }
+
+    /********************************************************************************
+     * Given a remaining percentage of burst, sets the combo bonus and rate of decay
+     ********************************************************************************/
+    public void SetComboBonus(float percentage)
+    {
+        comboBoostEarned = comboBoostMax * percentage;
+        comboBoostDecay = -comboBoostEarned / comboDashDuration;
     }
 
     private void OnDisable()

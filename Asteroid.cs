@@ -5,7 +5,7 @@ public class Asteroid : MonoBehaviour
     private ObjectPool asteroidPool;
 
     [SerializeField] protected int level; // When breaking, send out two asteroids of size - 1.
-    protected static float baseScore = 100;
+    protected static float baseScore = 0;
 
     private Rigidbody2D asteroidRb;
 

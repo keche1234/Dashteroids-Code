@@ -2,14 +2,15 @@ using UnityEngine;
 
 public class ShipState : MonoBehaviour
 {
-    [Header("Lives")]
-    [SerializeField] protected int startingLives;
+    [Header("Respawning")]
+    //[SerializeField] protected int startingLives;
     [SerializeField] protected float respawnDelay;
     [SerializeField] protected float respawnInvinicibilityTime;
-    [SerializeField] protected float burstInvincibilityTime;
-    [SerializeField] protected LifeUI lifeCounter;
+    [SerializeField] protected float burstDuration;
+    [SerializeField] protected MeterUI respawnUI;
+    //[SerializeField] protected LifeUI lifeCounter;
 
-    private int currentLives;
+    //private int currentLives;
     private float respawnTimer;
     private float invincTimer;
 
@@ -28,15 +29,24 @@ public class ShipState : MonoBehaviour
     [SerializeField] protected TrailRenderer superDashTrail;
     protected int scoreMultiplier = 1;
 
+    [Header("Burst Dash Size Scaling")]
+    [SerializeField] protected Vector3 baseSize;
+    [Range(1f, float.MaxValue)]
+    [SerializeField] protected float burstMaxShipScale;
+
+    [Header("Dash Mercy")]
+    [Tooltip("Mercy invincibility applied after starting combo, in addition to the remaining burstTime.")]
+    [SerializeField] protected float mercyComboInvinc;
+    [Tooltip("Mercy invincibility applied after a dash or burst ends.")]
+    [SerializeField] protected float mercyFinishInvinc;
+
     [Header("Scoring")]
     [Tooltip("Points per units travelled while dashing")]
     [SerializeField] protected float dashPoints;
     [SerializeField] protected ScoreManager scoreManager;
 
-    //[Header("Bursting")]
-    private bool bursting;
-    private float burstActiveTime = 0.2f; // paranoia: burst should end upon contacting asteroid
-    private float burstTimer = 0f; // paranoia: brust should end upon contacting asteroid
+    [Header("Timer")]
+    [SerializeField] protected TimeManager timeManager;
 
     private SpriteRenderer sprite;
 
@@ -45,7 +55,7 @@ public class ShipState : MonoBehaviour
 
     private void Awake()
     {
-        currentLives = startingLives;
+        //currentLives = startingLives;
         respawnTimer = 0;
         invincTimer = 0;
 
@@ -69,28 +79,16 @@ public class ShipState : MonoBehaviour
     {
         LifeUpdate();
         DashUpdate();
-
-        // paranoia
-        //if (bursting)
-        //{
-        //    if (burstTimer <= 0)
-        //        bursting = false;
-
-        //    burstTimer -= Time.deltaTime;
-        //}
     }
 
     public void LifeUpdate()
     {
-        if (currentLives <= 0)
+        if (timeManager.GetTimeUp())
         {
-            // Game Over!
-            Debug.Log("Game over!");
-            this.enabled = false;
+            respawnUI.gameObject.SetActive(false);
         }
         else
         {
-            //Debug.Log("Invinc Timer: " + invincTimer);
             if (!alive)
             {
                 if (respawnTimer <= 0)
@@ -108,9 +106,13 @@ public class ShipState : MonoBehaviour
                     GetComponent<Rigidbody2D>().angularVelocity = 0f;
 
                     superDashTrail.emitting = true;
+                    respawnUI.gameObject.SetActive(false);
                 }
                 else
+                {
                     respawnTimer -= Time.deltaTime;
+                    respawnUI.SetSliderPercentage(1f - (respawnTimer / respawnDelay));
+                }
             }
             else
             {
@@ -124,6 +126,7 @@ public class ShipState : MonoBehaviour
 
     public void DashUpdate()
     {
+        float remainingBurstPercentage = Mathf.Clamp01(burstDashTimer / burstDuration);
         switch (dashState)
         {
             case DashState.SuperDashing:
@@ -139,56 +142,76 @@ public class ShipState : MonoBehaviour
                 {
                     dashState = DashState.Neutral;
                     scoreManager.ResetMultiplier();
+                    invincTimer = mercyFinishInvinc;
                 }
                 superDashTimer -= Time.deltaTime;
+
+                if (burstDashTimer >= 0f)
+                {
+                    transform.localScale = baseSize * Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
+                    superDashTrail.widthMultiplier = Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
+                    superDashTrail.emitting = true;
+                    burstDashTimer -= Time.deltaTime;
+                }
+
                 break;
             case DashState.Bursting:
                 // Add Score
                 superDashTrail.time = Mathf.Clamp(superDashTrail.time + (trailRate * Time.deltaTime), 0.0f, burstDashTimer * trailRate);
 
-                if (burstDashTimer > 0.0f)
+                if (burstDashTimer > 0f)
                 {
                     scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+
+                    transform.localScale = baseSize * Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
+                    superDashTrail.widthMultiplier = Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
                     superDashTrail.emitting = true;
                 }
                 else
                 {
                     dashState = DashState.Neutral;
+                    shipControl.SetComboBonus(0f);
+                    transform.localScale = baseSize;
+                    invincTimer = mercyFinishInvinc;
+                    superDashTrail.widthMultiplier = 1f;
                     scoreManager.ResetMultiplier();
                 }
 
                 burstDashTimer -= Time.deltaTime;
                 break;
             default:
+                superDashTrail.emitting = false;
                 break;
         }
     }
 
     public void OnTriggerEnter2D(Collider2D collision)
     {
-        GameObject target;
-        Asteroid asteroid;
-
-        if ((target = collision.gameObject) && (asteroid = target.GetComponent<Asteroid>()))
+        if (!timeManager.GetTimeUp())
         {
-            if (alive)
+            GameObject target;
+            Asteroid asteroid;
+
+            if ((target = collision.gameObject) && (asteroid = target.GetComponent<Asteroid>()))
             {
-                Vector2 normal = (transform.position - target.transform.position).normalized;
-                if (dashState == DashState.Bursting)
+                if (alive)
                 {
-                    asteroid.BreakAsteroid(normal);
+                    Vector2 normal = (transform.position - target.transform.position).normalized;
+                    if (dashState == DashState.Bursting)
+                    {
+                        asteroid.BreakAsteroid(normal);
 
-                    scoreManager.AddScore(asteroid.GetScoreValue(), false);
-                    scoreManager.IncrementMultiplier();
+                        scoreManager.AddScore(asteroid.GetScoreValue(), false);
+                        scoreManager.IncrementMultiplier();
 
-                    StartSuperDash(shipControl.GetComboDuration());
-                    invincTimer = burstInvincibilityTime;
-                    bursting = false;
+                        StartSuperDash(shipControl.GetComboDuration());
+                        invincTimer = burstDashTimer + mercyComboInvinc;
+                    }
+                    else if (invincTimer > 0 || !asteroid.CanDestroyPlayer())
+                        asteroid.BreakAsteroid(normal);
+                    else
+                        Explode();
                 }
-                else if (invincTimer > 0 || !asteroid.CanDestroyPlayer())
-                    asteroid.BreakAsteroid(normal);
-                else
-                    Explode();
             }
         }
     }
@@ -200,21 +223,23 @@ public class ShipState : MonoBehaviour
         alive = false;
         shipControl.enabled = false;
         sprite.enabled = false;
-        currentLives--;
+        //currentLives--;
 
         // Start respawn
         respawnTimer = respawnDelay;
+        respawnUI.gameObject.SetActive(true);
+        respawnUI.SetSliderPercentage(1f - (respawnTimer / respawnDelay));
 
         // Reset dash stats
         superDashTimer = 0;
-        bursting = false;
+        transform.localScale = baseSize;
+        superDashTrail.widthMultiplier = 1f;
 
         // Stop combo Trail
         superDashTrail.emitting = false;
         superDashTrail.time = 0;
 
-        // Update life counter
-        lifeCounter.SetLifeCount(currentLives);
+        //lifeCounter.SetLifeCount(currentLives);
 
         // Update Score Multiplier
         scoreManager.ResetMultiplier();
@@ -241,10 +266,15 @@ public class ShipState : MonoBehaviour
     public void StartSuperDash(float t)
     {
         superDashTimer = t;
+        transform.localScale = baseSize;
         superDashTrail.emitting = true;
         superDashTrail.time = trailRate;
+        superDashTrail.widthMultiplier = 1f;
 
         dashState = DashState.SuperDashing;
+
+        // Update controller's speed
+        shipControl.SetComboBonus(burstDashTimer / burstDuration);
     }
 
     /************************************
@@ -258,16 +288,6 @@ public class ShipState : MonoBehaviour
 
         dashState = DashState.Bursting;
     }
-
-    //public bool IsDashing()
-    //{
-    //    return dashTimer > 0;
-    //}
-
-    //public bool IsBursting()
-    //{
-    //    return bursting;
-    //}
 
     public enum DashState
     {
