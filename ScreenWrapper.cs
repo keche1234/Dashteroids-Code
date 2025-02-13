@@ -10,9 +10,6 @@ public class ScreenWrapper : MonoBehaviour
     //0.1 of the view size
     [SerializeField] protected float baseMargin;
 
-    // TODO: Try out speed dependent wrapping?
-
-
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {

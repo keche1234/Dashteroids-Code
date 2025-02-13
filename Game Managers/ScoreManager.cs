@@ -6,7 +6,7 @@ public class ScoreManager : MonoBehaviour
     [Header("Score Multiplier")]
     [SerializeField] protected float multiplierGrowth;
     [SerializeField] protected float maxMultiplier;
-    protected float scoreMultiplier = 1.0f;
+    protected float scoreMultiplier = 0f;
 
     [Header("UI")]
     [Tooltip("Points per second")]
@@ -37,9 +37,9 @@ public class ScoreManager : MonoBehaviour
 
     public void AddScore(float score, bool rolling)
     {
-        trueScore += score * scoreMultiplier;
+        trueScore += score;
         if (!rolling)
-            rollingScore += score * scoreMultiplier;
+            rollingScore += score;
     }
 
     public void IncrementMultiplier()
@@ -48,9 +48,14 @@ public class ScoreManager : MonoBehaviour
         multiplierText.text = "x" + scoreMultiplier.ToString("0");
     }
 
+    public float GetScoreMultiplier()
+    {
+        return scoreMultiplier;
+    }
+
     public void ResetMultiplier()
     {
-        scoreMultiplier = 1;
+        scoreMultiplier = 0f;
         multiplierText.text = "x1";
     }
 }

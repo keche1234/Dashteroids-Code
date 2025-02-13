@@ -4,9 +4,6 @@ using UnityEngine;
 public class ShipController : MonoBehaviour
 {
     //[Header("Controls")]
-    //[SerializeField] private KeyCode forwardBtn;
-    //[SerializeField] private KeyCode turnLeftBtn;
-    //[SerializeField] private KeyCode turnRightBtn;
     [SerializeField] private KeyCode actionButton;
 
     [Header("Movement")]
@@ -15,10 +12,6 @@ public class ShipController : MonoBehaviour
     [SerializeField] protected float turnSpeed;
     [Range(0f, 180f)]
     [SerializeField] protected float easeAtDegrees;
-    //[SerializeField] private float thrust;
-    //[SerializeField] private float turnStrength;
-    //[SerializeField] private float maxFlightSpeed;
-    //[SerializeField] private float maxRotationSpeed;
     protected Rigidbody2D playerRb;
     protected ScreenWrapper screenWrapper;
 
@@ -66,9 +59,6 @@ public class ShipController : MonoBehaviour
         playerRb = GetComponent<Rigidbody2D>();
         shipState = GetComponent<ShipState>();
         screenWrapper = GetComponent<ScreenWrapper>();
-
-        //burstingSpeed = baseDashSpeed * burstSpeedGrowth;
-        //burstBonus = 1.0f;
     }
 
     // Update is called once per frame
@@ -85,7 +75,7 @@ public class ShipController : MonoBehaviour
                 SuperDashUpdate();
                 break;
             case ShipState.DashState.Bursting:
-                playerRb.linearVelocity = transform.up * burstSpeed;
+                BurstDashUpdate();
                 break;
             default:
                 break;
@@ -122,7 +112,6 @@ public class ShipController : MonoBehaviour
                     meterUI.gameObject.SetActive(true);
                 }
 
-                //Debug.Log("Charge: " + (chargeProgress / chargeDuration));
             }
             else if (Input.GetKeyUp(actionButton))
             {
@@ -130,7 +119,6 @@ public class ShipController : MonoBehaviour
                 {
                     Debug.Log("Super Dash!");
                     shipState.StartSuperDash(superDashDuration);
-                    //burstBonus = 1.0f;
                 }
                 else
                 {
@@ -167,9 +155,17 @@ public class ShipController : MonoBehaviour
             shipState.StartBurstDash(burstDuration);
         else
         {
+            //Debug.Log("Dash Speed = " + (superDashBaseSpeed + comboBoostEarned));
             playerRb.linearVelocity = transform.up * (superDashBaseSpeed + comboBoostEarned);
             comboBoostEarned += comboBoostDecay * Time.deltaTime;
         }
+    }
+
+    protected void BurstDashUpdate()
+    {
+        if (Input.GetKeyDown(actionButton) && shipState.CanBurstAgain())
+            shipState.StartBurstDash(burstDuration);
+        playerRb.linearVelocity = transform.up * burstSpeed;
     }
 
     protected void RotateShip()
@@ -178,13 +174,18 @@ public class ShipController : MonoBehaviour
         Vector3 dashAim = (mouseWorldPoint - transform.position).normalized;
         float easing = 1f - Mathf.Clamp01(((easeAtDegrees - Vector3.Angle(transform.up, dashAim)) / easeAtDegrees) * 0.5f);
 
-        Vector3 lookDirection = Vector3.RotateTowards(transform.up, dashAim, easing * turnSpeed * Mathf.PI / 180.0f, 0);
+        Vector3 lookDirection = Vector3.RotateTowards(transform.up, dashAim, easing * turnSpeed * Mathf.PI / 180.0f, 1f);
         transform.rotation = Quaternion.LookRotation(transform.forward, lookDirection);
     }
 
     public float GetComboDuration()
     {
         return comboDashDuration;
+    }
+
+    public float GetBurstDuration()
+    {
+        return burstDuration;
     }
 
     /********************************************************************************
