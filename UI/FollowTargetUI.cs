@@ -19,42 +19,46 @@ public class FollowTargetUI : MonoBehaviour
     // Update is called once per frame
     void LateUpdate()
     {
-        transform.position = (Vector2) target.transform.position + offset;
-
-        if (bounding)
+        if (target)
         {
-            //this is the width of the screen in world units (it depends on the camera settings)
-            //add a margin so the wrapping area is slightly larger than the camera view and the asteroids
-            //exit the screen before teleporting on the other side
-            float screenWidth = Camera.main.orthographicSize * Camera.main.aspect * 2;
-            float screenHeight = Camera.main.orthographicSize * 2;
+            transform.position = (Vector2)target.transform.position + offset;
+            transform.rotation = Quaternion.Euler(0, 0, 0);
 
-            //I can't assign a vector component to a transform directly so I use a temporary variable
-            //even if most of the times won't be changes
-            Vector2 newPosition = transform.position;
-
-            //check all the margin 
-            if (transform.position.x > (screenWidth - xMargin) / 2)
+            if (bounding)
             {
-                newPosition.x = (screenWidth - pushX) / 2;
-            }
+                //this is the width of the screen in world units (it depends on the camera settings)
+                //add a margin so the wrapping area is slightly larger than the camera view and the asteroids
+                //exit the screen before teleporting on the other side
+                float screenWidth = Camera.main.orthographicSize * Camera.main.aspect * 2;
+                float screenHeight = Camera.main.orthographicSize * 2;
 
-            if (transform.position.x < -(screenWidth - xMargin) / 2)
-            {
-                newPosition.x = -(screenWidth - pushX) / 2;
-            }
+                //I can't assign a vector component to a transform directly so I use a temporary variable
+                //even if most of the times won't be changes
+                Vector2 newPosition = transform.position;
 
-            if (transform.position.y > (screenHeight - yMargin) / 2)
-            {
-                newPosition.y = (screenHeight - pushY) / 2;
-            }
+                //check all the margin 
+                if (transform.position.x > (screenWidth - xMargin) / 2)
+                {
+                    newPosition.x = (screenWidth - pushX) / 2;
+                }
 
-            if (transform.position.y < -(screenHeight - yMargin) / 2)
-            {
-                newPosition.y = -(screenHeight - pushY) / 2;
-            }
+                if (transform.position.x < -(screenWidth - xMargin) / 2)
+                {
+                    newPosition.x = -(screenWidth - pushX) / 2;
+                }
 
-            transform.position = newPosition;
+                if (transform.position.y > (screenHeight - yMargin) / 2)
+                {
+                    newPosition.y = (screenHeight - pushY) / 2;
+                }
+
+                if (transform.position.y < -(screenHeight - yMargin) / 2)
+                {
+                    newPosition.y = -(screenHeight - pushY) / 2;
+                }
+
+                transform.position = newPosition;
+            }
         }
     }
 }

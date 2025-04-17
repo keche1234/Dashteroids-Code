@@ -1,10 +1,13 @@
 using UnityEngine;
-using TMPro;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+using TMPro;
 
 public class TimeManager : MonoBehaviour
 {
-    [SerializeField] protected ShipController shipControl;
+    protected DashteroidsActions inputActions;
+    [SerializeField] protected ShipController[] shipControllers;
 
     [Header("Timer")]
     [Range(1f, 9000f)]
@@ -12,6 +15,7 @@ public class TimeManager : MonoBehaviour
     [SerializeField] protected float startingTime;
     [Range(1f, 9000f)]
     [SerializeField] protected float maxTime;
+    [SerializeField] protected float bountyBeginsAt;
     [SerializeField] protected TextMeshProUGUI timerUI;
     protected float timeRemaining; // in seconds
     protected bool timeUp = false;
@@ -29,6 +33,17 @@ public class TimeManager : MonoBehaviour
         timeRemaining = startingTime;
         audioSource = audioSourceObject.GetComponent<AudioSource>();
         audioMusicLoop = audioSourceObject.GetComponent<MusicLoop>();
+
+        inputActions = new DashteroidsActions();
+        inputActions.Player.Enable();
+        inputActions.bindingMask = InputBinding.MaskByGroup(inputActions.GamepadScheme.bindingGroup);
+
+        shipControllers = FindObjectsByType<ShipController>(FindObjectsSortMode.None);
+    }
+
+    private void OnDisable()
+    {
+        inputActions.Player.Disable();
     }
 
     // Update is called once per frame
@@ -60,7 +75,8 @@ public class TimeManager : MonoBehaviour
         else
         {
             timeUp = true;
-            shipControl.enabled = false;
+            foreach (ShipController ship in shipControllers)
+                ship.enabled = false;
             gameOverMessage.SetActive(true);
 
             if (audioSource && !victoryClipPlayed)
@@ -73,7 +89,7 @@ public class TimeManager : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.Return))
+        if (inputActions.Player.Start.WasPerformedThisFrame())
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
 
         if (Input.GetKeyDown(KeyCode.Q))

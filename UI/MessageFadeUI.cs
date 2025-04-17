@@ -3,7 +3,7 @@ using TMPro;
 
 public class MessageFadeUI : MonoBehaviour
 {
-    protected TextMeshProUGUI message;
+    [SerializeField] protected TextMeshProUGUI message;
     [SerializeField] protected Color baseColor; // gradually shifts alpha to 0
     [Tooltip("Duration of alpha = 1")]
     [SerializeField] protected float fullDuration;
@@ -44,14 +44,19 @@ public class MessageFadeUI : MonoBehaviour
 
     public void SetMessage(string s, bool startFade)
     {
-        message.text = s;
-        isFading = startFade;
+        if (!message) message = GetComponent<TextMeshProUGUI>();
 
-        if (isFading)
+        if (!message)
         {
-            fullTimer = fullDuration;
-            fadeTimer = fadeDuration;
-            message.color = new Color(baseColor.r, baseColor.g, baseColor.b, 1f);
+            message.text = s;
+            isFading = startFade;
+
+            if (isFading)
+            {
+                fullTimer = fullDuration;
+                fadeTimer = fadeDuration;
+                message.color = new Color(baseColor.r, baseColor.g, baseColor.b, 1f);
+            }
         }
     }
 

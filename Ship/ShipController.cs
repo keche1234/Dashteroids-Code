@@ -1,10 +1,22 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+using System.Collections.Generic;
+using static UnityEngine.InputSystem.InputAction;
+using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(ShipState))]
 public class ShipController : MonoBehaviour
 {
     //[Header("Controls")]
-    [SerializeField] private KeyCode actionButton;
+    protected PlayerInput playerInput;
+    //protected DashteroidsActions inputActions;
+
+    [Header("Multiplayer")]
+    [SerializeField] protected int playerIndex = 0;
+    protected InputDevice myDevice;
+    protected static int activePlayerCount = 0;
+    protected static List<bool> activePlayerSlots = new List<bool>();
 
     [Header("Movement")]
     [Tooltip("In degrees per second")]
@@ -28,8 +40,8 @@ public class ShipController : MonoBehaviour
     [SerializeField] protected int dashBandCount;
 
     //[SerializeField] protected float dashSpeedCap;
-    [Tooltip("Multiplies dash strength force by this value when dashing to counteract current velocity.")]
     [Range(1f, 2f)]
+    [Tooltip("Multiplies dash strength force by this value when dashing to counteract current velocity.")]
     [SerializeField] protected float counteractingDashForce;
     protected float chargeTimer = 0.0f;
     protected float dashCooldownTimer = 0.0f;
@@ -39,7 +51,8 @@ public class ShipController : MonoBehaviour
     [SerializeField] protected float comboDashDuration; // duration of a super dash off of a burst combo
     //[SerializeField] private float dashTurnStrength;
     [SerializeField] protected float superDashBaseSpeed;
-    [SerializeField] protected MeterUI meterUI;
+    [SerializeField] protected GameObject dashCanvas;
+    [SerializeField] protected MeterUI dashMeterUI;
 
     [Header("Burst Dash")]
     [SerializeField] protected float burstSpeed;
@@ -59,23 +72,38 @@ public class ShipController : MonoBehaviour
         playerRb = GetComponent<Rigidbody2D>();
         shipState = GetComponent<ShipState>();
         screenWrapper = GetComponent<ScreenWrapper>();
+
+        playerInput = GetComponent<PlayerInput>();
+        dashCanvas.transform.parent = transform.parent;
+
+        //inputActions = new DashteroidsActions();
+        //inputActions.Player.Enable();
+        //inputActions.bindingMask = InputBinding.MaskByGroup(inputActions.GamepadScheme.bindingGroup);
     }
 
     // Update is called once per frame
     void Update()
     {
+        ShipState.HitState myHitState = shipState.GetHitState();
         ShipState.DashState myDashState = shipState.GetDashState();
 
-        switch (myDashState)
+        switch (myHitState)
         {
-            case ShipState.DashState.Neutral:
-                NeutralDashUpdate();
-                break;
-            case ShipState.DashState.SuperDashing:
-                SuperDashUpdate();
-                break;
-            case ShipState.DashState.Bursting:
-                BurstDashUpdate();
+            case ShipState.HitState.None:
+                switch (myDashState)
+                {
+                    case ShipState.DashState.Neutral:
+                        NeutralDashUpdate();
+                        break;
+                    case ShipState.DashState.SuperDashing:
+                        SuperDashUpdate();
+                        break;
+                    case ShipState.DashState.Bursting:
+                        BurstDashUpdate();
+                        break;
+                    default:
+                        break;
+                }
                 break;
             default:
                 break;
@@ -91,33 +119,31 @@ public class ShipController : MonoBehaviour
         if (dashCooldownTimer <= 0f)
         {
             float chargeProgress;
-            if (Input.GetKey(actionButton))
+            if (playerInput.actions.FindAction("Dash").IsPressed())
             {
                 chargeTimer += Time.deltaTime;
                 chargeTimer = Mathf.Clamp(chargeTimer, 0, chargeDuration * 1.05f);
                 chargeProgress = chargeTimer / chargeDuration;
 
-                meterUI.SetSliderPercentage(chargeProgress);
+                dashMeterUI.SetSliderPercentage(chargeProgress);
 
                 if (dashBandCount > 1)
                 {
                     if (chargeProgress > 1f / dashBandCount) // if charge progress exceeds 1 band
-                        meterUI.gameObject.SetActive(true);
+                        dashMeterUI.gameObject.SetActive(true);
                     else
-                        meterUI.gameObject.SetActive(false);
-
+                        dashMeterUI.gameObject.SetActive(false);
                 }
                 else
                 {
-                    meterUI.gameObject.SetActive(true);
+                    dashMeterUI.gameObject.SetActive(true);
                 }
 
             }
-            else if (Input.GetKeyUp(actionButton))
+            else if (playerInput.actions.FindAction("Dash").WasReleasedThisFrame())
             {
                 if (chargeTimer >= chargeDuration)
                 {
-                    Debug.Log("Super Dash!");
                     shipState.StartSuperDash(superDashDuration);
                 }
                 else
@@ -143,7 +169,7 @@ public class ShipController : MonoBehaviour
 
                 dashCooldownTimer = dashCooldown;
                 chargeTimer = 0;
-                meterUI.gameObject.SetActive(false);
+                dashMeterUI.gameObject.SetActive(false);
             }
         }
     }
@@ -151,7 +177,7 @@ public class ShipController : MonoBehaviour
     protected void SuperDashUpdate()
     {
         RotateShip();
-        if (Input.GetKeyDown(actionButton))
+        if (playerInput.actions.FindAction("Dash").WasPerformedThisFrame())
             shipState.StartBurstDash(burstDuration);
         else
         {
@@ -163,19 +189,26 @@ public class ShipController : MonoBehaviour
 
     protected void BurstDashUpdate()
     {
-        if (Input.GetKeyDown(actionButton) && shipState.CanBurstAgain())
+        RotateShip(0.2f);
+        if (playerInput.actions.FindAction("Dash").WasPerformedThisFrame() && shipState.CanBurstAgain())
             shipState.StartBurstDash(burstDuration);
         playerRb.linearVelocity = transform.up * burstSpeed;
     }
 
-    protected void RotateShip()
+    protected void RotateShip(float turnSpeedModifier = 1)
     {
-        Vector3 mouseWorldPoint = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Vector3 dashAim = (mouseWorldPoint - transform.position).normalized;
-        float easing = 1f - Mathf.Clamp01(((easeAtDegrees - Vector3.Angle(transform.up, dashAim)) / easeAtDegrees) * 0.5f);
+        Vector2 dashAim = playerInput.actions.FindAction("Aim").ReadValue<Vector2>();
+        if (dashAim != Vector2.zero)
+        {
+            float angle = Vector2.Angle(transform.up, dashAim);
+            if (angle == 180)
+                dashAim = Quaternion.Euler(0, 0, 1) * dashAim;
 
-        Vector3 lookDirection = Vector3.RotateTowards(transform.up, dashAim, easing * turnSpeed * Mathf.PI / 180.0f, 1f);
-        transform.rotation = Quaternion.LookRotation(transform.forward, lookDirection);
+            float easing = 1f - Mathf.Clamp01(((easeAtDegrees - angle) / easeAtDegrees) * 0.5f);
+
+            Vector3 lookDirection = Vector3.RotateTowards(transform.up, dashAim, easing * turnSpeed * turnSpeedModifier * Mathf.PI / 180.0f, 1f);
+            transform.rotation = Quaternion.LookRotation(transform.forward, lookDirection);
+        }
     }
 
     public float GetComboDuration()
@@ -197,10 +230,60 @@ public class ShipController : MonoBehaviour
         comboBoostDecay = -comboBoostEarned / comboDashDuration;
     }
 
+    /**************
+     * Multiplayer
+     **************/
+    public int GetPlayerIndex()
+    {
+        return playerIndex;
+    }
+
+    public void SetDevice(InputDevice device)
+    {
+        myDevice = device;
+        Debug.Log("Device of Player " + playerIndex + " is " + device + " (" + device.deviceId + ")");
+    }
+
+    private void OnEnable()
+    {
+        //inputActions.Player.Enable();
+
+        //// Multiplayer
+
+        //activePlayerCount++;
+        //if (playerIndex < activePlayerSlots.Count && !activePlayerSlots[playerIndex]) // my slot is available
+        //{
+        //    activePlayerSlots[playerIndex] = true;
+        //    return;
+        //}
+
+        //for (int i = 0; i < activePlayerSlots.Count; i++) // find a new slot
+        //{
+        //    if (!activePlayerSlots[i])
+        //    {
+        //        activePlayerSlots[i] = true;
+        //        playerIndex = i;
+        //        return;
+        //    }
+        //}
+
+        //// All player slots are active
+        //activePlayerSlots.Add(true);
+        //playerIndex = activePlayerSlots.Count - 1;
+    }
+
     private void OnDisable()
     {
+        //inputActions.Player.Disable();
         chargeTimer = 0;
-        if (meterUI)
-            meterUI.gameObject.SetActive(false);
+        if (dashMeterUI)
+            dashMeterUI.gameObject.SetActive(false);
+
+        //// Multiplayer
+        //if (playerIndex >= 0 && playerIndex < activePlayerSlots.Count)
+        //    activePlayerSlots[playerIndex] = false;
+        //if (activePlayerCount > 0 && !activePlayerSlots[activePlayerCount - 1])
+        //    activePlayerSlots.RemoveAt(activePlayerCount - 1);
+        //activePlayerCount--;
     }
 }
