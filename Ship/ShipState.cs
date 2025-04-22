@@ -8,8 +8,9 @@ public class ShipState : MonoBehaviour
 {
     protected GameManager gameManager;
     protected TimeManager timeManager;
+    protected PlayerManager playerManager;
     protected BountyManager bountyManager;
-    
+
     [Header("Respawning")]
     //[SerializeField] protected int startingLives;
     [SerializeField] protected float respawnDelay;
@@ -108,14 +109,18 @@ public class ShipState : MonoBehaviour
     protected static int shipCount = 0;
 
     private SpriteRenderer sprite;
+    [Header("Multiplayer Visuals")]
+    [SerializeField] private SpriteRenderer multiplayerIcon;
+    [SerializeField] private BattleScoreUI scoreUI;
 
     // Other ship scripts
     private ShipController shipControl;
 
     private void Awake()
     {
+        // TODO: Set the ship number properly
         shipCount++;
-        name = "Player " + shipCount.ToString();
+        //name = "Player " + shipCount.ToString();
 
         //currentLives = startingLives;
         respawnTimer = 0;
@@ -136,18 +141,42 @@ public class ShipState : MonoBehaviour
 
         gameManager = GameObject.Find("GameManager").GetComponent<GameManager>();
         timeManager = GameObject.Find("GameManager").GetComponent<TimeManager>();
+        playerManager = GameObject.Find("PlayerManager").GetComponent<PlayerManager>();
         bountyManager = gameManager.GetBountyManager();
 
         ScoreManager[] sm = FindObjectsByType<ScoreManager>(FindObjectsSortMode.None);
         if (sm == null || sm.Length < 1)
-            Debug.LogError("No score manager found in scene!");
-
-        scoreManager = sm[0];
+            Debug.LogWarning("No score manager found in scene!");
+        else
+            scoreManager = sm[0];
 
         if (minScore > maxScore)
             Debug.LogWarning("Min Score should not be greater than Max Score! Setting Max Score to Min Score.");
 
         superDashHits = new Dictionary<ShipState, float>();
+
+        if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
+        {
+            PaletteSet palette = playerManager.GetPaletteSet(shipCount - 1);
+            if (palette != null)
+            {
+                sprite.color = palette.shipColor;
+                multiplayerIcon.sprite = palette.iconSprite;
+                multiplayerIcon.color = palette.iconColor;
+                //multiplayerIcon.transform.SetParent(transform.parent);
+
+                superDashStartColor = palette.superDashStartColor;
+                superDashEndColor = palette.superDashEndColor;
+                burstDashStartColor = palette.burstDashStartColor;
+                burstDashEndColor = palette.burstDashEndColor;
+            }
+
+            scoreUI = playerManager.GetScoreUI(shipCount - 1);
+            if (scoreUI != null)
+            {
+                scoreUI.gameObject.SetActive(true);
+            }
+        }
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -196,6 +225,8 @@ public class ShipState : MonoBehaviour
                     alive = true;
                     shipControl.enabled = true;
                     sprite.enabled = true;
+                    if (multiplayerIcon)
+                        multiplayerIcon.enabled = true;
 
                     respawnTimer = respawnDelay;
                     invincTimer = respawnInvinicibilityTime;
@@ -232,21 +263,26 @@ public class ShipState : MonoBehaviour
             case DashState.SuperDashing:
                 // Add Score
                 dashTrail.time = Mathf.Clamp(dashTrail.time + (trailRate * Time.deltaTime), 0.0f, superDashTimer * trailRate);
+                transform.localScale = baseSize;
 
                 if (superDashTimer > 0.0f)
                 {
-                    scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
-                    if (comboStarted)
-                        comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
+                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                    {
+                        scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                        if (comboStarted)
+                            comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
+                    }
                     dashTrail.emitting = true;
                 }
                 else
                 {
                     dashState = DashState.Neutral;
-                    scoreManager.ResetMultiplier();
+                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                        scoreManager.ResetMultiplier();
                     if (comboStarted)
                     {
-                        if (gameManager.GetGetMode() == GameManager.GameMode.ScoreAttack)
+                        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
                         {
                             stateMessage.SetMessage(comboScore.ToString("0") + " pts.", true);
                             stateMessage.transform.parent.GetComponent<FollowTargetUI>().enabled = true;
@@ -291,9 +327,12 @@ public class ShipState : MonoBehaviour
                 dashTrail.time = Mathf.Clamp(dashTrail.time + (trailRate * Time.deltaTime), 0.0f, burstDashTimer * trailRate);
                 if (burstMercyInvincTimer > 0f)
                 {
-                    scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
-                    if (comboStarted)
-                        comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
+                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                    {
+                        scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                        if (comboStarted)
+                            comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
+                    }
 
                     transform.localScale = baseSize * Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
                     dashTrail.widthMultiplier = Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
@@ -307,7 +346,7 @@ public class ShipState : MonoBehaviour
                     shipControl.SetComboBonus(0f);
                     transform.localScale = baseSize;
                     dashTrail.widthMultiplier = 1f;
-                    scoreManager.ResetMultiplier();
+                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack) scoreManager.ResetMultiplier();
                     burstDashTimer = 0f;
                 }
 
@@ -316,6 +355,7 @@ public class ShipState : MonoBehaviour
                 break;
             default:
                 dashTrail.emitting = false;
+                transform.localScale = baseSize;
                 break;
         }
     }
@@ -369,7 +409,7 @@ public class ShipState : MonoBehaviour
                         asteroid.BreakAsteroid(normal);
                         CameraShakeManager.instance.CameraShake(impulseSource);
 
-                        switch (gameManager.GetGetMode())
+                        switch (gameManager.GetGameMode())
                         {
                             case GameManager.GameMode.ScoreAttack:
                                 scoreManager.AddScore(asteroid.GetScoreValue(), false);
@@ -393,7 +433,9 @@ public class ShipState : MonoBehaviour
                     else if (dashState == DashState.SuperDashing && burstMercyInvincTimer > 0f)
                     {
                         asteroid.BreakAsteroid(normal);
-                        scoreManager.AddScore(asteroid.GetScoreValue(), false);
+
+                        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                            scoreManager.AddScore(asteroid.GetScoreValue(), false);
                         canDoubleBurst = true;
                         //StartSuperDash(shipControl.GetComboDuration());
                     }
@@ -404,7 +446,7 @@ public class ShipState : MonoBehaviour
                     else
                     {
                         Explode();
-                        if (gameManager.GetGetMode() == GameManager.GameMode.ArenaBattle)
+                        if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
                         {
                             if (lastHitMe)
                             {
@@ -421,7 +463,7 @@ public class ShipState : MonoBehaviour
                     }
                 }
             }
-            else if (gameManager.GetGetMode() == GameManager.GameMode.ArenaBattle)
+            else if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
             {
                 if (alive && (target = collision.gameObject) && (opponent = target.GetComponent<ShipState>()))
                 {
@@ -513,7 +555,7 @@ public class ShipState : MonoBehaviour
                                             CameraShakeManager.instance.CameraShake(impulseSource);
 
                                             SuperDashCombo(0.25f);
-                                            AddArenaBattlePoints(opponent.GetBurstKOValue() + (bountyManager.HasBounty(opponent) ? opponent.GetBurstBountyValue(): 0));
+                                            AddArenaBattlePoints(opponent.GetBurstKOValue() + (bountyManager.HasBounty(opponent) ? opponent.GetBurstBountyValue() : 0));
                                             break;
                                     }
                                     break;
@@ -538,7 +580,6 @@ public class ShipState : MonoBehaviour
     public void Explode()
     {
         // Explode
-        Debug.Log("BOOM!");
         alive = false;
         shipControl.enabled = false;
         sprite.enabled = false;
@@ -550,10 +591,11 @@ public class ShipState : MonoBehaviour
 
         // Reset dash stats
         superDashTimer = 0;
-        transform.localScale = baseSize;
 
         // Stop combo Trail
         StopComboTrail();
+        if (multiplayerIcon)
+            multiplayerIcon.enabled = false;
 
         // Reset hit state
         hitState = HitState.None;
@@ -563,7 +605,8 @@ public class ShipState : MonoBehaviour
         //lifeCounter.SetLifeCount(currentLives);
 
         // Update Score Multiplier
-        scoreManager.ResetMultiplier();
+        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+            scoreManager.ResetMultiplier();
     }
 
     /*
@@ -718,15 +761,48 @@ public class ShipState : MonoBehaviour
     public void AddArenaBattlePoints(int points)
     {
         arenaBattleScore += points;
-        stateMessage.SetMessage("+" + points, true);
         arenaBattleScore = Mathf.Clamp(arenaBattleScore, minScore, maxScore);
-        Debug.Log(name + " has " + arenaBattleScore + " points!");
+        scoreUI.score.text = arenaBattleScore.ToString("00.#") + " pts.";
+
+        stateMessage.gameObject.SetActive(true);
+        string txt = (points > 0 ? "+" : "") + points.ToString("0.#") + " pts.";
+        stateMessage.SetMessage(txt, true);
+        stateMessage.transform.parent.GetComponent<FollowTargetUI>().enabled = false;
+        stateMessage.transform.position = transform.position;
+
         bountyManager.NeedToComputeBounty();
     }
 
     public int GetArenaBattleScore()
     {
         return arenaBattleScore;
+    }
+
+    public void SetPlayerNumberFromIndex(int i)
+    {
+        name = "Player " + (i + 1);
+        scoreUI?.gameObject.SetActive(false);
+        SetPaletteFromIndex(i);
+    }
+
+    protected void SetPaletteFromIndex(int i)
+    {
+        PaletteSet palette = playerManager.GetPaletteSet(i);
+        if (palette != null)
+        {
+            sprite.color = palette.shipColor;
+            multiplayerIcon.sprite = palette.iconSprite;
+            multiplayerIcon.color = palette.iconColor;
+            //multiplayerIcon.transform.SetParent(transform.parent);
+
+            superDashStartColor = palette.superDashStartColor;
+            superDashEndColor = palette.superDashEndColor;
+            burstDashStartColor = palette.burstDashStartColor;
+            burstDashEndColor = palette.burstDashEndColor;
+        }
+
+        scoreUI = playerManager.GetScoreUI(i);
+        scoreUI?.gameObject.SetActive(true);
     }
 
     /************************************
@@ -753,6 +829,11 @@ public class ShipState : MonoBehaviour
         dashTrail.time = 0;
         dashTrail.startColor = burstDashStartColor;
         dashTrail.endColor = burstDashEndColor;
+    }
+
+    private void OnDestroy()
+    {
+        shipCount--;
     }
 
     public enum DashState

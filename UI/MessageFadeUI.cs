@@ -46,7 +46,7 @@ public class MessageFadeUI : MonoBehaviour
     {
         if (!message) message = GetComponent<TextMeshProUGUI>();
 
-        if (!message)
+        if (message)
         {
             message.text = s;
             isFading = startFade;

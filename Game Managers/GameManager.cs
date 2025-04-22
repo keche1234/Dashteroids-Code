@@ -21,7 +21,7 @@ public class GameManager : MonoBehaviour
         gameMode = mode;
     }
 
-    public GameMode GetGetMode()
+    public GameMode GetGameMode()
     {
         return gameMode;
     }

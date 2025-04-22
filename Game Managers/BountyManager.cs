@@ -31,11 +31,6 @@ public class BountyManager : MonoBehaviour
                 maxScore = ships[i].GetArenaBattleScore();
 
         bountyScore = maxScore;
-        Debug.Log("Bounty score is " + bountyScore);
-
-        for (int i = 0; i < ships.Length; i++)
-            if (HasBounty(ships[i]))
-                Debug.Log(ships[i] + " has a bounty.");
     }
 
     public bool HasBounty(ShipState ship)
