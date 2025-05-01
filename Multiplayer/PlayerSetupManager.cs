@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 // Holds the PlayerSetupInfoSingles
 public class PlayerSetupManager : MonoBehaviour
@@ -41,6 +42,11 @@ public class PlayerSetupManager : MonoBehaviour
         inputActions.UI.Enable();
     }
 
+    private void OnEnable()
+    {
+        startMessage = GameObject.Find("Game State Canvas").transform.GetChild(1).gameObject;
+    }
+
     // Update is called once per frame
     void Update()
     {
@@ -48,11 +54,10 @@ public class PlayerSetupManager : MonoBehaviour
         {
             if (quitTimer <= 0)
             {
-#if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-#endif
+                SceneManager.LoadScene("MainMenu");
+                Destroy(gameObject);
             }
-            quitTimer -= Time.deltaTime;
+            quitTimer -= Time.unscaledDeltaTime;
         }
         else
             quitTimer = quitConfirmTime;
@@ -137,6 +142,11 @@ public class PlayerSetupManager : MonoBehaviour
             return null;
         }
         return playerPalettes[i];
+    }
+
+    public void OnDisable()
+    {
+        inputActions?.UI.Disable();
     }
 
     public GameMode GetGameMode()

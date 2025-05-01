@@ -11,6 +11,7 @@ public class PlayerSetupInfoSingle : MonoBehaviour
     [SerializeField] protected Image shipImage;
     [SerializeField] protected Image shipIcon;
     [SerializeField] protected TextMeshProUGUI playerName;
+    [SerializeField] protected GameObject shipVisual;
 
     // Get player index and device
     protected PlayerInput playerInput;
@@ -55,7 +56,21 @@ public class PlayerSetupInfoSingle : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        RotateShip();
+    }
 
+    protected void RotateShip()
+    {
+        Vector2 dashAim = playerInput.actions.FindAction("AimDemo").ReadValue<Vector2>();
+        if (dashAim != Vector2.zero)
+        {
+            float angle = Vector2.Angle(transform.up, dashAim);
+            if (angle == 180)
+                dashAim = Quaternion.Euler(0, 0, 1) * dashAim;
+
+            Vector3 lookDirection = Vector3.RotateTowards(transform.up, dashAim, 2 * Mathf.PI, 1f);
+            shipVisual.transform.rotation = Quaternion.LookRotation(transform.forward, lookDirection);
+        }
     }
 
     public void LeaveGame()
@@ -70,12 +85,12 @@ public class PlayerSetupInfoSingle : MonoBehaviour
         {
             case PlayerSetupManager.GameMode.ScoreAttack:
                 playerSetupManager.StartingGame(true);
-                SceneManager.LoadScene("ScoreAttack");
+                SceneManager.LoadScene("ScoreAttack_Main");
                 playerSetupManager.GetComponent<PlayerInputManager>().DisableJoining();
                 break;
             case PlayerSetupManager.GameMode.ArenaBattle:
                 playerSetupManager.StartingGame(true);
-                SceneManager.LoadScene("ArenaBattle");
+                SceneManager.LoadScene("ArenaBattle_Main");
                 playerSetupManager.GetComponent<PlayerInputManager>().DisableJoining();
                 break;
             default:

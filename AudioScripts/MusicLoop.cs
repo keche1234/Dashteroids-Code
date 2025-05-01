@@ -6,7 +6,12 @@ public class MusicLoop : MonoBehaviour
     public AudioClip musicStart;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
+    {
+        
+    }
+
+    private void OnEnable()
     {
         musicSource.PlayOneShot(musicStart);
         musicSource.PlayScheduled(AudioSettings.dspTime + musicStart.length);

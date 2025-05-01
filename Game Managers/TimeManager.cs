@@ -3,10 +3,13 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using TMPro;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 
 public class TimeManager : MonoBehaviour
 {
     protected DashteroidsActions inputActions;
+    protected InputSystemUIInputModule inputSystemUIInputModule;
     [SerializeField] protected ShipController[] shipControllers;
 
     [Header("Timer")]
@@ -20,10 +23,15 @@ public class TimeManager : MonoBehaviour
     protected float timeRemaining; // in seconds
     protected bool timeUp = false;
 
+    protected float resultsTimer = 0;
+
     [Header("Game State")]
     [SerializeField] protected GameObject gameOverMessage;
     [SerializeField] protected GameObject audioSourceObject;
     [SerializeField] protected AudioClip timeOverSound;
+    [SerializeField] protected GameObject gameOverOptions;
+    [SerializeField] protected GameObject firstGameOverOption;
+    [SerializeField] protected GameObject gameOverLeaderboard;
     protected AudioSource audioSource;
     protected MusicLoop audioMusicLoop;
     protected bool victoryClipPlayed = false;
@@ -36,14 +44,17 @@ public class TimeManager : MonoBehaviour
 
         inputActions = new DashteroidsActions();
         inputActions.Player.Enable();
+        inputActions.UI.Enable();
         inputActions.bindingMask = InputBinding.MaskByGroup(inputActions.GamepadScheme.bindingGroup);
 
         shipControllers = FindObjectsByType<ShipController>(FindObjectsSortMode.None);
+        inputSystemUIInputModule = GameObject.Find("EventSystem").GetComponent<InputSystemUIInputModule>();
     }
 
     private void OnDisable()
     {
         inputActions.Player.Disable();
+        inputActions.UI.Disable();
     }
 
     // Update is called once per frame
@@ -74,10 +85,26 @@ public class TimeManager : MonoBehaviour
         }
         else
         {
+            if (!timeUp)
+            {
+                gameOverMessage.SetActive(true);
+
+                switch (GetComponent<GameManager>().GetGameMode())
+                {
+                    case GameManager.GameMode.ScoreAttack:
+                        gameOverOptions.SetActive(true);
+                        EventSystem.current.SetSelectedGameObject(firstGameOverOption);
+                        break;
+                    case GameManager.GameMode.ArenaBattle:
+                        gameOverLeaderboard.SetActive(true);
+                        break;
+                    default:
+                        break;
+                }
+                GetComponent<GameManager>().EndGame();
+                shipControllers = FindObjectsByType<ShipController>(FindObjectsSortMode.None);
+            }
             timeUp = true;
-            foreach (ShipController ship in shipControllers)
-                ship.enabled = false;
-            gameOverMessage.SetActive(true);
 
             if (audioSource && !victoryClipPlayed)
             {
@@ -87,10 +114,33 @@ public class TimeManager : MonoBehaviour
                 audioSource.PlayOneShot(timeOverSound);
                 victoryClipPlayed = true;
             }
+
+            if (GetComponent<GameManager>().GetGameMode() == GameManager.GameMode.ArenaBattle)
+            {
+                if (resultsTimer < 1f)
+                {
+                    resultsTimer += Time.deltaTime;
+                }
+                else
+                {
+                    if (gameOverLeaderboard.activeSelf && inputActions.UI.Submit.WasPressedThisFrame())
+                    {
+                        gameOverLeaderboard.SetActive(false);
+                        gameOverOptions.SetActive(true);
+                        GetComponent<GameManager>().AddActionBuffer(1f / 60);
+                        EventSystem.current.SetSelectedGameObject(firstGameOverOption);
+                        foreach (ShipController ship in shipControllers)
+                        {
+                            MultiplayerEventSystem eventSystem = ship.gameObject.GetComponent<MultiplayerEventSystem>();
+                            eventSystem.SetSelectedGameObject(firstGameOverOption);
+                        }
+                    }
+                }
+            }
         }
 
-        if (inputActions.Player.Start.WasPerformedThisFrame())
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        //if (inputActions.Player.Start.WasPerformedThisFrame())
+        //    SceneManager.LoadScene(SceneManager.GetActiveScene().name);
 
         if (Input.GetKeyDown(KeyCode.Q))
             Application.Quit();
@@ -104,6 +154,11 @@ public class TimeManager : MonoBehaviour
     public bool GetTimeUp()
     {
         return timeUp;
+    }
+
+    public bool BountyIsActive()
+    {
+        return timeRemaining <= bountyBeginsAt;
     }
 
     public void AddTime(float t)
