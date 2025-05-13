@@ -13,7 +13,7 @@ public class ShipController : MonoBehaviour
     //[Header("Controls")]
     protected PlayerInput playerInput;
 
-    [SerializeField] protected TutorialConfirmSingle tutorialConfirm;
+    [SerializeField] protected ModeTutorialConfirmSingle tutorialConfirm;
     protected bool gameStarted = false;
     //protected DashteroidsActions inputActions;
 
@@ -71,7 +71,6 @@ public class ShipController : MonoBehaviour
     //[SerializeField] private float dashTurnStrength;
     [SerializeField] protected float superDashBaseSpeed;
     [SerializeField] protected GameObject dashCanvas;
-    [SerializeField] protected MeterUI dashMeterUI;
 
     [Header("Super Dash - Visual")]
     [Range(1f, float.MaxValue)]
@@ -91,6 +90,7 @@ public class ShipController : MonoBehaviour
 
     // Other ship scripts
     protected ShipState shipState;
+    protected ShipSound shipSound;
     protected InputSystemUIInputModule inputSystemUIInputModule;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -98,6 +98,7 @@ public class ShipController : MonoBehaviour
     {
         playerRb = GetComponent<Rigidbody2D>();
         shipState = GetComponent<ShipState>();
+        shipSound = GetComponent<ShipSound>();
         screenWrapper = GetComponent<ScreenWrapper>();
 
         playerInput = GetComponent<PlayerInput>();
@@ -152,16 +153,12 @@ public class ShipController : MonoBehaviour
                             break;
                         default:
                             chargeTimer = 0;
-                            if (dashMeterUI)
-                                dashMeterUI.gameObject.SetActive(false);
                             break;
                     }
                 }
                 else
                 {
                     chargeTimer = 0;
-                    if (dashMeterUI)
-                        dashMeterUI.gameObject.SetActive(false);
                 }
                 if (playerInput.actions.FindAction("Start").WasPerformedThisFrame())
                 {
@@ -191,9 +188,6 @@ public class ShipController : MonoBehaviour
             float chargeProgress;
             if (playerInput.actions.FindAction("Dash").IsPressed())
             {
-                if (chargeTimer == 0) // start the charge animation, but only if no charge has been accumulated
-                    shipState.chargeParticleSystem.Play();
-
                 chargeTimer += Time.deltaTime;
                 chargeTimer = Mathf.Clamp(chargeTimer, 0, chargeDuration * 1.05f);
                 chargeProgress = chargeTimer / chargeDuration;
@@ -203,33 +197,38 @@ public class ShipController : MonoBehaviour
                     shipState.ScaleShipInstant(new Vector3(Mathf.Sqrt(Mathf.Lerp(1f, chargeStretchMax, chargeProgress)),
                                                            Mathf.Lerp(1f, chargeSquashMax, chargeProgress), 1),
                                                new Vector3(0.5f, 0.0f, 0.5f));
-                dashMeterUI.SetSliderPercentage(chargeProgress);
 
-                if (dashBandCount > 1)
+                // Particle System and Sound
+                if (chargeTimer >= chargeDuration / dashBandCount && chargeTimer < chargeDuration && !shipState.chargeParticleSystem.isPlaying) // start the charge animation, but only if no charge has been accumulated
+                    shipState.RestartParticleSystemAtMe(shipState.chargeParticleSystem);
+                
+                if (chargeProgress >= 1)
                 {
-                    if (chargeProgress > 1f / dashBandCount) // if charge progress exceeds 1 band
-                        dashMeterUI.gameObject.SetActive(true);
-                    else
-                        dashMeterUI.gameObject.SetActive(false);
+                    if (!shipState.IsChargeFlashing()) shipState.StartShipChargeFlash();
+                    if (shipSound.charge.isPlaying) shipSound.charge.Stop();
+                    if (!shipSound.chargeReady.isPlaying)
+                    {
+                        shipSound.chargeReady.Play();
+                    }
                 }
                 else
                 {
-                    dashMeterUI.gameObject.SetActive(true);
+                    if (!shipSound.charge.isPlaying) shipSound.charge.Play();
                 }
-
-                if (chargeProgress >= 1 && !shipState.chargeFullParticleSystem.isPlaying)
-                    shipState.chargeFullParticleSystem.Play();
-
             }
             else if (chargeTimer > 0) // if (playerInput.actions.FindAction("Dash").WasReleasedThisFrame())
             {
+                shipState.chargeParticleSystem.time = shipState.chargeParticleSystem.main.duration;
                 shipState.chargeParticleSystem.Stop();
-                shipState.chargeFullParticleSystem.Stop();
 
                 if (chargeTimer >= chargeDuration)
                 {
                     shipState.StartSuperDash(superDashDuration);
                     shipState.ScaleShipGradulal(new Vector3(1, launchStretchMax, 1), Vector3.one, new Vector3(0.5f, 0.0f, 0.5f), launchStretchTime);
+
+                    shipSound.chargeReady.Stop();
+                    shipSound.superDashLaunch.Play();
+                    shipSound.superDashSustain.Play();
                 }
                 else
                 {
@@ -241,7 +240,7 @@ public class ShipController : MonoBehaviour
 
                         float integralProgress = (float)bandProgress / (dashBandCount - 1);
                         float dashStrength = Mathf.Lerp(dashStrengthBase, dashStrengthMax, integralProgress);
-                        playerRb.AddForce(transform.up * dashStrength * counteractingDashForce, ForceMode2D.Impulse);
+                        playerRb.AddForce(counteractingDashForce * dashStrength * transform.up, ForceMode2D.Impulse);
                         if (playerRb.linearVelocity.magnitude > dashStrength)
                             playerRb.linearVelocity = playerRb.linearVelocity.normalized * dashStrength;
                         shipState.ScaleShipGradulal(new Vector3(Mathf.Lerp(1, launchSquishMax, integralProgress), Mathf.Lerp(1, launchStretchMax, integralProgress), 1),
@@ -249,18 +248,19 @@ public class ShipController : MonoBehaviour
                     }
                     else
                     {
-                        playerRb.AddForce(transform.up * dashStrengthBase * counteractingDashForce, ForceMode2D.Impulse);
+                        playerRb.AddForce(counteractingDashForce * dashStrengthBase * transform.up, ForceMode2D.Impulse);
                         if (playerRb.linearVelocity.magnitude > dashStrengthBase)
                             playerRb.linearVelocity = playerRb.linearVelocity.normalized * dashStrengthBase;
                         shipState.ScaleShipGradulal(new Vector3(Mathf.Lerp(1, launchStretchMax, 0.5f), Mathf.Lerp(1, launchStretchMax, 0.5f), 1),
                                                     Vector3.one, new Vector3(0.5f, 0.0f, 0.5f), launchStretchTime);
                     }
-                    shipState.neutralDashParticleSystem.Play();
+                    shipState.RestartParticleSystemAtMe(shipState.neutralDashParticleSystem);
+                    shipSound.dash.Play();
+                    shipSound.chargeReady.Stop();
                 }
 
                 dashCooldownTimer = dashCooldown;
                 chargeTimer = 0;
-                dashMeterUI.gameObject.SetActive(false);
             }
         }
     }
@@ -269,7 +269,11 @@ public class ShipController : MonoBehaviour
     {
         RotateShip();
         if (playerInput.actions.FindAction("Dash").WasPerformedThisFrame())
+        {
             shipState.StartBurstDash(burstDuration);
+            shipSound.superDashSustain.Stop();
+            shipSound.burstDash.Play();
+        }
         else
         {
             playerRb.linearVelocity = transform.up * (superDashBaseSpeed + comboBoostEarned);
@@ -287,7 +291,20 @@ public class ShipController : MonoBehaviour
 
     protected void RotateShip(float turnSpeedModifier = 1)
     {
-        Vector2 dashAim = playerInput.actions.FindAction("Aim").ReadValue<Vector2>();
+        Vector2 dashAim = Vector2.zero;
+        switch (playerInput.currentControlScheme)
+        {
+            case "Gamepad":
+                dashAim = playerInput.actions.FindAction("Aim").ReadValue<Vector2>();
+                break;
+            case "Keyboard&Mouse":
+                Vector2 mouseWorld = Camera.main.ScreenToWorldPoint(playerInput.actions.FindAction("Target").ReadValue<Vector2>());
+                dashAim = (mouseWorld - new Vector2(transform.position.x, transform.position.y)).normalized;
+                break;
+            default:
+                break;
+        }
+
         if (dashAim != Vector2.zero)
         {
             float angle = Vector2.Angle(transform.up, dashAim);
@@ -303,7 +320,7 @@ public class ShipController : MonoBehaviour
 
     public void PauseGame()
     {
-        gameManager.PauseGame();
+        gameManager.PauseGame(shipState);
     }
 
     public void ShowTutorial()
@@ -358,7 +375,5 @@ public class ShipController : MonoBehaviour
     {
         //inputActions.Player.Disable();
         chargeTimer = 0;
-        if (dashMeterUI)
-            dashMeterUI.gameObject.SetActive(false);
     }
 }

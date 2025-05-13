@@ -51,7 +51,7 @@ public class TimeManager : MonoBehaviour
         inputSystemUIInputModule = GameObject.Find("EventSystem").GetComponent<InputSystemUIInputModule>();
     }
 
-    private void OnDisable()
+    public void OnDisable()
     {
         inputActions.Player.Disable();
         inputActions.UI.Disable();
@@ -166,4 +166,5 @@ public class TimeManager : MonoBehaviour
         timeRemaining += t;
         timeRemaining = Mathf.Clamp(timeRemaining, 0, maxTime);
     }
+
 }

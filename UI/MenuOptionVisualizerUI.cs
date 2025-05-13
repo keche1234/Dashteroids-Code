@@ -27,6 +27,11 @@ public class MenuOptionVisualizerUI : MonoBehaviour
         submitted = false;
     }
 
+    public void SetSelectColor(Color sc)
+    {
+        selectColor = sc;
+    }
+
     public void OnSelect()
     {
         if (!submitted)

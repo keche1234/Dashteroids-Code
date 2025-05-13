@@ -16,9 +16,11 @@ public class GameManager : MonoBehaviour
     protected TimeManager timeManager;
     protected PlayerManager playerManager;
     protected BountyManager bountyManager;
-    protected TutorialManager tutorialManager;
+    protected ModeTutorialManager tutorialManager;
 
     protected PlayerInput soloPlayer;
+
+    [SerializeField] protected bool tutorial = false;
 
     [Header("General Game Information")]
     [SerializeField] protected GameMode gameMode;
@@ -29,8 +31,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] protected float transitionFadeTime;
 
     [Header("Visual Elements - Pause")]
+    [SerializeField] protected TextMeshProUGUI pauseTitle;
     [SerializeField] protected GameObject pauseMenu;
     [SerializeField] protected GameObject continueButton;
+    [SerializeField] protected bool countdownOnGameStart = true;
 
     [Header("Visual Elements - Countdown")]
     [SerializeField] protected TextMeshProUGUI countdownNumber;
@@ -48,7 +52,7 @@ public class GameManager : MonoBehaviour
         timeManager = GetComponent<TimeManager>();
         playerManager = GameObject.Find("PlayerManager")?.GetComponent<PlayerManager>();
         bountyManager = GetComponent<BountyManager>();
-        tutorialManager = GetComponent<TutorialManager>();
+        tutorialManager = GetComponent<ModeTutorialManager>();
 
         if (gameMode == GameMode.ScoreAttack)
         {
@@ -59,7 +63,7 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        actionBuffer = Mathf.Clamp(actionBuffer -= Time.unscaledTime, 0, actionBuffer);
+        actionBuffer = Mathf.Clamp(actionBuffer - Time.unscaledDeltaTime, 0, actionBuffer);
         switch (gameState)
         {
             case GameState.Tutorial:
@@ -83,7 +87,16 @@ public class GameManager : MonoBehaviour
     public void StartGame()
     {
         pauseMenu.SetActive(false);
-        startGameCoroutine = StartCoroutine(StartGameCoroutine());
+        if (countdownOnGameStart)
+            startGameCoroutine = StartCoroutine(StartGameCoroutine());
+        else
+        {
+            gameState = GameState.Playing;
+
+            soloPlayer?.SwitchCurrentActionMap("Player");
+            playerManager?.SetPlayerMaps("Player");
+            if (!tutorial) timeManager.enabled = true;
+        }
     }
 
     protected IEnumerator StartGameCoroutine()
@@ -91,7 +104,7 @@ public class GameManager : MonoBehaviour
         // Turn off screen fade
         for (float t = 0; t < transitionFadeTime; t += Time.unscaledDeltaTime)
         {
-            screenWhite.color = new Color(1, 1, 1, 1 - (t / transitionFadeTime));
+            screenWhite.color = new Color(1, 1, 1, 1f - (t / transitionFadeTime));
             yield return null;
         }
         // Set state to countdown
@@ -99,7 +112,7 @@ public class GameManager : MonoBehaviour
         yield return null;
 
         // Do the countdown
-        // TOJUICE: numbers shrink from 1.5 scale to 1, fade numbers as time goes down
+        // TOJUICE: numbers shrink from 1.5 scale to 0.5, fade numbers as time goes down
         countdownNumber.gameObject.SetActive(true);
         for (float t = 3; t >= 0; t -= Time.unscaledDeltaTime)
         {
@@ -123,7 +136,7 @@ public class GameManager : MonoBehaviour
         }
 
         // Enable TimeManager
-        timeManager.enabled = true;
+        if (!tutorial) timeManager.enabled = true;
         countdownNumber.gameObject.SetActive(false);
         yield return null;
     }
@@ -136,30 +149,56 @@ public class GameManager : MonoBehaviour
 
     public void ShowTutorial()
     {
+        PlayerUISelectAll(null);
         gameState = GameState.Tutorial;
         tutorialManager.ShowTutorial();
     }
 
-    public void PauseGame()
+    public void PauseGame(ShipState player)
     {
         if (gameState != GameState.Paused) // Pause the game
         {
             gameState = GameState.Paused;
-            pauseMenu.SetActive(true);
-            EventSystem.current.SetSelectedGameObject(continueButton);
-            continueButton.GetComponent<MenuOptionVisualizerUI>().OnSelect();
+            pauseMenu?.SetActive(true);
+            switch (gameMode)
+            {
+                case GameMode.ScoreAttack:
+                    EventSystem.current.SetSelectedGameObject(continueButton);
+                    break;
+                case GameMode.ArenaBattle:
+                    if (player)
+                    {
+                        player.GetComponent<MultiplayerEventSystem>().SetSelectedGameObject(continueButton);
+                        foreach (MenuOptionVisualizerUI option in pauseMenu.GetComponentsInChildren<MenuOptionVisualizerUI>())
+                        {
+                            //option.SetSelectColor(player.GetMainColor());
+                            option.OnDeselect();
+                        }
+                        pauseTitle.color = player.GetMainColor();
+                    }
+                    break;
+            }
+            continueButton?.GetComponent<MenuOptionVisualizerUI>().OnSelect();
 
             soloPlayer?.SwitchCurrentActionMap("UI");
             playerManager?.SetPlayerMaps("UI");
         }
         else // Unpause the game
         {
-            Debug.Log("Unpausing");
-            EventSystem.current.SetSelectedGameObject(null);
-            StartGame();
-            soloPlayer?.SwitchCurrentActionMap("Player");
-            playerManager?.SetPlayerMaps("Player");
+            UnpauseGame();
         }
+    }
+
+    public void UnpauseGame()
+    {
+        Debug.Log("Unpausing");
+        EventSystem.current.SetSelectedGameObject(null);
+        if (gameMode == GameMode.ArenaBattle)
+            PlayerUISelectAll(null);
+
+        StartGame();
+        soloPlayer?.SwitchCurrentActionMap("Player");
+        playerManager?.SetPlayerMaps("Player");
     }
 
     public void StartCountdown()
@@ -180,7 +219,7 @@ public class GameManager : MonoBehaviour
     {
         return bountyManager;
     }
-    public TutorialManager GetTutorialManager()
+    public ModeTutorialManager GetTutorialManager()
     {
         return tutorialManager;
     }
@@ -214,6 +253,11 @@ public class GameManager : MonoBehaviour
         return gameState;
     }
 
+    public bool InTutorialMode()
+    {
+        return tutorial;
+    }
+
     public void AddActionBuffer(float f)
     {
         actionBuffer += f;
@@ -242,8 +286,8 @@ public class GameManager : MonoBehaviour
     public enum GameMode
     {
         None = 0b_00,
-        ScoreAttack = 0b_01,
-        ArenaBattle = 0b_10
+        ScoreAttack = 0b_10,
+        ArenaBattle = 0b_11
     }
 
     public enum GameState

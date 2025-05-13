@@ -10,11 +10,11 @@ public class PlayerSetupManager : MonoBehaviour
     protected PlayerInputManager playerInputManager;
     [SerializeField] protected GameMode gameMode;
     [SerializeField] protected int minimumPlayerCount;
-    [SerializeField] protected bool canStartGame = false;
     [SerializeField] protected Dictionary<int, InputDevice> playerDevices;
     [SerializeField] protected List<PaletteSet> playerPalettes;
     [SerializeField] protected GameObject startMessage;
-    private bool startingGame = false;
+    protected bool canStartGame = false;
+    protected bool startingGame = false;
 
     [Header("Quit")]
     [SerializeField] protected float quitConfirmTime = 4f;
@@ -146,7 +146,7 @@ public class PlayerSetupManager : MonoBehaviour
 
     public void OnDisable()
     {
-        inputActions?.UI.Disable();
+        inputActions.UI.Disable();
     }
 
     public GameMode GetGameMode()

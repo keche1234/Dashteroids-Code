@@ -5,19 +5,22 @@ public class Asteroid : MonoBehaviour
     private ObjectPool asteroidPool;
 
     [SerializeField] protected int level; // When breaking, send out two asteroids of size - 1.
+
+    [Header("Sound Effects")]
+    public AudioSource asteroidDestroyedSound;
     protected static float baseScore = 0;
 
+    // ASteroid properties
     private Rigidbody2D asteroidRb;
-
     private static float baseSize = 1f;
     private static float totalSize;
     private static float spawnMercyTime = 2.0f; // asteroids need to be in play on screen for this amount of time before destroying the player
     private static float spawnTimer = 0.0f; // how long has the asteroid been in play?
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
         asteroidRb = GetComponent<Rigidbody2D>();
+        asteroidDestroyedSound.transform.SetParent(transform.parent);
     }
 
     // Update is called once per frame
@@ -86,7 +89,7 @@ public class Asteroid : MonoBehaviour
                 }
             }
         }
-
+        asteroidDestroyedSound.Play();
         gameObject.SetActive(false);
     }
 
@@ -97,7 +100,7 @@ public class Asteroid : MonoBehaviour
 
         float halfSize = Mathf.Pow(baseSize, level)/2;
 
-        return (Mathf.Abs(transform.position.x) <= (screenWidth / 2) + halfSize || Mathf.Abs(transform.position.y) <= ((screenWidth/2) + halfSize));
+        return (Mathf.Abs(transform.position.x) <= (screenWidth / 2) + halfSize || Mathf.Abs(transform.position.y) <= ((screenHeight/2) + halfSize));
     }
 
     public void EndMercyTime()

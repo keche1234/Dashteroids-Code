@@ -53,7 +53,6 @@ public class UICollisionFade : MonoBehaviour
     {
         if (collisionTags.Contains(collision.tag))
         {
-            Debug.Log("Add " + collision.gameObject);
             collided.Add(collision.gameObject);
             if (collided.Count == 1)
             {
@@ -66,10 +65,9 @@ public class UICollisionFade : MonoBehaviour
 
     public void OnTriggerExit2D(Collider2D collision)
     {
-        // TODO: remove collider if tag, check alpha
+        // Rremove collider if in list, check alpha
         if (collided.Contains(collision.gameObject))
         {
-            Debug.Log("Remove " + collision.gameObject);
             collided.Remove(collision.gameObject);
             if (collided.Count == 0)
             {

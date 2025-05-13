@@ -7,14 +7,11 @@ public class ObjectPool : MonoBehaviour
     public List<GameObject> pooledObjects;
     public GameObject objectToPool;
     public int amountToPool;
-    private void Awake()
-    {
-        //SharedInstance = this;
-    }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
+        //SharedInstance = this;
         pooledObjects = new List<GameObject>();
         GameObject tmp;
         for (int i = 0; i < amountToPool; i++)
@@ -27,6 +24,10 @@ public class ObjectPool : MonoBehaviour
         }
     }
 
+    /*
+     * Attempts to retreive an object from the object pool.
+     * Returns null if there is no object.
+     */
     public GameObject GetPooledObject()
     {
         for (int i = 0; i < amountToPool; i++)

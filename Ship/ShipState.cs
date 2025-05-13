@@ -110,11 +110,16 @@ public class ShipState : MonoBehaviour
 
     [Header("Particle Systems")]
     [SerializeField] public ParticleSystem chargeParticleSystem;
-    [SerializeField] public ParticleSystem chargeFullParticleSystem;
     [SerializeField] public ParticleSystem neutralDashParticleSystem;
     [SerializeField] public ParticleSystem superDashParticleSystem;
     [SerializeField] public ParticleSystem burstDashParticleSystem;
     [SerializeField] public ParticleSystem koParticleSystem;
+
+    [Header("Charge Flash")]
+    [SerializeField] protected Color chargeReadyBaseColor;
+    [SerializeField] protected Color chargeReadyFlashColor;
+    [SerializeField] protected float flashDuration;
+    protected Coroutine chargeFlashCoroutine = null;
 
     protected int arenaBattleScore = 0;
 
@@ -131,6 +136,7 @@ public class ShipState : MonoBehaviour
 
     // Other ship scripts
     private ShipController shipControl;
+    private ShipSound shipSound;
 
     private void Awake()
     {
@@ -142,6 +148,7 @@ public class ShipState : MonoBehaviour
         invincTimer = 0;
 
         shipControl = GetComponent<ShipController>();
+        shipSound = GetComponent<ShipSound>();
         sprite = GetComponent<SpriteRenderer>();
         impulseSource = GetComponent<CinemachineImpulseSource>();
 
@@ -152,7 +159,7 @@ public class ShipState : MonoBehaviour
 
         respawnCanvas.transform.SetParent(transform.parent);
         respawnCanvas.transform.position = Vector3.zero;
-        stateMessage.transform.parent.SetParent(transform.parent);
+        stateMessage?.transform.parent.SetParent(transform.parent);
 
         if (bountyCrown)
         {
@@ -176,10 +183,15 @@ public class ShipState : MonoBehaviour
 
         superDashHits = new Dictionary<ShipState, float>();
 
+        chargeParticleSystem.transform.SetParent(transform.parent);
+        neutralDashParticleSystem.transform.SetParent(transform.parent);
+        superDashParticleSystem.transform.SetParent(transform.parent);
+        burstDashParticleSystem.transform.SetParent(transform.parent);
+        koParticleSystem.transform.SetParent(transform.parent);
+
         if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
-        {
             SetPaletteFromIndex(shipCount - 1);
-        }
+
         invincibilityBubble.gameObject.SetActive(false);
         invincibilityBubble.transform.SetParent(transform.parent);
     }
@@ -231,8 +243,7 @@ public class ShipState : MonoBehaviour
                     invincTimer = respawnInvinicibilityTime;
                     invincibilityBubble?.gameObject.SetActive(false);
 
-                    transform.position = respawnPosition;
-                    transform.rotation = Quaternion.LookRotation(transform.forward, respawnLookVector);
+                    transform.SetPositionAndRotation(respawnPosition, Quaternion.LookRotation(transform.forward, respawnLookVector));
                     GetComponent<Rigidbody2D>().linearVelocity = Vector3.zero;
                     GetComponent<Rigidbody2D>().angularVelocity = 0f;
 
@@ -266,15 +277,15 @@ public class ShipState : MonoBehaviour
         switch (dashState)
         {
             case DashState.SuperDashing:
-                // Add Score
                 dashTrail.time = Mathf.Clamp(dashTrail.time + (trailRate * Time.deltaTime), 0.0f, superDashTimer * trailRate);
                 //transform.localScale = baseSize;
 
                 if (superDashTimer > 0.0f)
                 {
-                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                    if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack && !timeManager.GetTimeUp())
                     {
-                        scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                        // Add score
+                        scoreManager?.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
                         if (comboStarted)
                             comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
                     }
@@ -284,19 +295,16 @@ public class ShipState : MonoBehaviour
                 {
                     dashState = DashState.Neutral;
                     if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
-                        scoreManager.ResetMultiplier();
+                        scoreManager?.ResetMultiplier();
                     if (comboStarted)
                     {
                         if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
                         {
-                            stateMessage.SetMessage(comboScore.ToString("0") + " pts.", true);
-                            stateMessage.transform.parent.GetComponent<FollowTarget>().enabled = true;
-                            stateMessage.transform.localPosition = transform.position;
-                            comboStarted = false;
+                            EndScoreAttackCombo();
                         }
                     }
                     comboScore = 0;
-                    //invincTimer = mercyFinishInvinc;
+                    shipSound.superDashSustain.Stop();
                 }
                 superDashTimer -= Time.deltaTime;
 
@@ -319,6 +327,10 @@ public class ShipState : MonoBehaviour
                 {
                     dashTrail.startColor = superDashStartColor;
                     dashTrail.endColor = superDashEndColor;
+                    //if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                    //{
+                    //    EndScoreAttackCombo();
+                    //}
                 }
 
                 foreach (ShipState ship in superDashHits.Keys)
@@ -335,13 +347,13 @@ public class ShipState : MonoBehaviour
                     if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
                     {
                         // Add Score
-                        scoreManager.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
+                        scoreManager?.AddScore(playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints, false);
                         if (comboStarted)
                             comboScore += playerRb.linearVelocity.magnitude * Time.deltaTime * dashPoints;
                     }
 
-                    transform.localScale = baseSize * Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale); // TODO: Remove this (ShipController will initiate stretch upon Burst)
-                    dashTrail.widthMultiplier = Mathf.Clamp((1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage)), 1f, burstMaxShipScale);
+                    transform.localScale = baseSize * Mathf.Clamp(1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage), 1f, burstMaxShipScale); // TODO: Remove this (ShipController will initiate stretch upon Burst)
+                    dashTrail.widthMultiplier = Mathf.Clamp(1f + ((burstMaxShipScale - 1f) * remainingBurstPercentage), 1f, burstMaxShipScale);
                     dashTrail.emitting = true;
                     dashTrail.startColor = burstDashStartColor;
                     dashTrail.endColor = burstDashEndColor;
@@ -354,11 +366,7 @@ public class ShipState : MonoBehaviour
                     dashTrail.widthMultiplier = 1f;
                     if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
                     {
-                        scoreManager.ResetMultiplier();
-                        stateMessage.SetMessage(comboScore.ToString("0") + " pts.", true);
-                        stateMessage.transform.parent.GetComponent<FollowTarget>().enabled = true;
-                        stateMessage.transform.localPosition = transform.position;
-                        comboStarted = false;
+                        EndScoreAttackCombo();
                     }
                     comboScore = 0;
                     burstDashTimer = 0f;
@@ -426,15 +434,21 @@ public class ShipState : MonoBehaviour
                         switch (gameManager.GetGameMode())
                         {
                             case GameManager.GameMode.ScoreAttack:
-                                scoreManager.AddScore(asteroid.GetScoreValue(), false);
-                                scoreManager.IncrementMultiplier();
+                                if (!gameManager.InTutorialMode())
+                                {
+                                    scoreManager?.AddScore(asteroid.GetScoreValue(), false);
+                                    scoreManager?.IncrementMultiplier();
 
-                                float timeBonus = baseTimeBonus * scoreManager.GetScoreMultiplier();
-                                timeManager.AddTime(timeBonus);
-                                stateMessage.gameObject.SetActive(true);
-                                stateMessage.SetMessage("+" + timeBonus.ToString("0.0###") + "s", true);
-                                stateMessage.transform.parent.GetComponent<FollowTarget>().enabled = false;
-                                stateMessage.transform.position = transform.position;
+                                    float timeBonus = baseTimeBonus * scoreManager.GetScoreMultiplier();
+                                    timeManager?.AddTime(timeBonus);
+                                    if (stateMessage)
+                                    {
+                                        stateMessage.gameObject.SetActive(true);
+                                        stateMessage.SetMessage("+" + timeBonus.ToString("0.0###") + "s", true);
+                                        stateMessage.transform.parent.GetComponent<FollowTarget>().enabled = false;
+                                        stateMessage.transform.position = transform.position;
+                                    }
+                                }
                                 break;
                             default:
                                 break;
@@ -448,7 +462,7 @@ public class ShipState : MonoBehaviour
                     {
                         asteroid.BreakAsteroid(normal);
 
-                        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack && !gameManager.InTutorialMode())
                             scoreManager.AddScore(asteroid.GetScoreValue(), false);
                         canDoubleBurst = true;
                         //StartSuperDash(shipControl.GetComboDuration());
@@ -479,6 +493,9 @@ public class ShipState : MonoBehaviour
             }
             else if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
             {
+                /*
+                 * Ship vs Ship interaction
+                 */
                 if (alive && (target = collision.gameObject) && (opponent = target.GetComponent<ShipState>()))
                 {
                     if (opponent.IsAlive())
@@ -495,7 +512,7 @@ public class ShipState : MonoBehaviour
                                 case DashState.Neutral:
                                     switch (opponent.GetLastDashState())
                                     {
-                                        case DashState.Neutral:
+                                        case DashState.Neutral: // Neutral vs Neutral
                                             float opSpeedPercentage = opponent.GetLastSpeed().magnitude / (lastSpeed.magnitude + opponent.GetLastSpeed().magnitude);
                                             opponent.Bonk(this, lastSpeed, 1f - opSpeedPercentage);
                                             break;
@@ -524,13 +541,12 @@ public class ShipState : MonoBehaviour
                                         case DashState.SuperDashing: // Super Dash vs Super Dash
                                             if (burstMercyInvincTimer > 0)
                                             {
-                                                Debug.Log("I have burst while super dashing! (" + burstMercyInvincTimer + ")");
-                                                if (opponent.IsBursting()) // burst vs burst
+                                                if (opponent.IsBursting()) // mercy burst vs any burst
                                                 {
                                                     opponent.transform.rotation = Quaternion.LookRotation(Vector3.forward, lastSpeed.normalized);
                                                     opponentRb.linearVelocity = lastSpeed * opponentRb.linearVelocity.magnitude;
                                                 }
-                                                else // burst vs no brust
+                                                else // mercy burst vs no brust
                                                 {
                                                     opponent.Explode();
                                                     CameraShakeManager.instance.CameraShake(impulseSource);
@@ -541,7 +557,6 @@ public class ShipState : MonoBehaviour
                                             }
                                             else
                                             {
-                                                Debug.Log("I DON\'T have burst while super dashing... (" + burstMercyInvincTimer + ")");
                                                 if (opponent.IsBursting()) // no burst vs burst
                                                 {
                                                     // lol get beaned (do nothing)
@@ -591,13 +606,28 @@ public class ShipState : MonoBehaviour
                                             0f, shipControl.GetBurstDuration() * burstMercyInvincMod);
     }
 
+    private void EndScoreAttackCombo()
+    {
+        if (comboStarted)
+        {
+            scoreManager?.ResetMultiplier();
+            if (stateMessage)
+            {
+                stateMessage.SetMessage(comboScore.ToString("0") + " pts.", true);
+                stateMessage.transform.parent.GetComponent<FollowTarget>().enabled = true;
+                stateMessage.transform.localPosition = transform.position;
+            }
+            comboStarted = false;
+        }
+    }
+
     public void Explode()
     {
         // Explode
         alive = false;
         sprite.enabled = false;
         playerRb.linearVelocity = Vector3.zero;
-        koParticleSystem.Play();
+        RestartParticleSystemAtMe(koParticleSystem);
 
         // Start respawn
         respawnTimer = respawnDelay;
@@ -608,23 +638,36 @@ public class ShipState : MonoBehaviour
         // Reset dash stats
         superDashTimer = 0;
 
-        // Stop combo Trail
+        // Reset hit state
+        hitState = HitState.None;
+
+        // Update Score Multiplier in ScoreAttack
+        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+            scoreManager?.ResetMultiplier();
+
+        bountyCrownChild?.SetActive(false);
+
+        // Reset Visuals
         StopComboTrail();
         if (multiplayerIcon)
             multiplayerIcon.enabled = false;
 
-        // Reset hit state
-        hitState = HitState.None;
-
+        if (scalingCoroutine != null)
+        {
+            StopCoroutine(scalingCoroutine);
+            scalingCoroutine = null;
+        }
         transform.localScale = baseSize;
 
-        //lifeCounter.SetLifeCount(currentLives);
+        if (chargeFlashCoroutine != null)
+        {
+            StopCoroutine(chargeFlashCoroutine);
+            chargeFlashCoroutine = null;
+            sprite.color = chargeReadyBaseColor;
+        }
 
-        // Update Score Multiplier
-        if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
-            scoreManager.ResetMultiplier();
-
-        bountyCrownChild?.SetActive(false);
+        // Play sound
+        shipSound.playerDestroyed.Play();
     }
 
     /*
@@ -767,6 +810,33 @@ public class ShipState : MonoBehaviour
         yield return null;
     }
 
+    public bool IsChargeFlashing()
+    {
+        return chargeFlashCoroutine != null;
+    }
+
+    public void StartShipChargeFlash()
+    {
+        if (chargeFlashCoroutine != null)
+            StopCoroutine(chargeFlashCoroutine);
+        chargeFlashCoroutine = StartCoroutine(ShipChargeFlash());
+    }
+
+    protected IEnumerator ShipChargeFlash()
+    {
+        while (true)
+        {
+            sprite.color = chargeReadyBaseColor;
+            for (float t = 0; t < flashDuration; t += Time.unscaledDeltaTime)
+                yield return null;
+
+            sprite.color = chargeReadyFlashColor;
+            for (float t = 0; t < flashDuration; t += Time.unscaledDeltaTime)
+                yield return null;
+
+            yield return null;
+        }
+    }
 
     // For collision usage ONLY
     public DashState GetLastDashState()
@@ -820,9 +890,21 @@ public class ShipState : MonoBehaviour
         dashTrail.endColor = superDashStartColor;
 
         // Particles
-        superDashParticleSystem.Play();
+        RestartParticleSystemAtMe(superDashParticleSystem);
+        if (chargeFlashCoroutine != null)
+        {
+            StopCoroutine(chargeFlashCoroutine);
+            chargeFlashCoroutine = null;
+            sprite.color = chargeReadyBaseColor;
+        }
 
         dashState = DashState.SuperDashing;
+
+        // Sound
+        shipSound.superDashLaunch.Stop();
+        shipSound.superDashSustain.Stop();
+        shipSound.superDashLaunch.Play();
+        //shipSound.superDashSustain.Play();
 
         // Update controller's speed
         shipControl.SetComboBonus(burstDashTimer / shipControl.GetBurstDuration());
@@ -845,7 +927,7 @@ public class ShipState : MonoBehaviour
         dashTrail.endColor = burstDashEndColor;
 
         // Particles
-        burstDashParticleSystem.Play();
+        RestartParticleSystemAtMe(burstDashParticleSystem);
 
         dashState = DashState.Bursting;
         canDoubleBurst = false;
@@ -928,6 +1010,7 @@ public class ShipState : MonoBehaviour
         {
             // Ship visuals
             sprite.color = palette.shipColor;
+            chargeReadyBaseColor = palette.shipColor;
             multiplayerIcon.sprite = palette.iconSprite;
             multiplayerIcon.color = palette.iconColor;
 
@@ -942,13 +1025,13 @@ public class ShipState : MonoBehaviour
             chargeMain.startColor = palette.iconColor;
 
             SetMainModuleColor(chargeParticleSystem, palette.iconColor);
-            SetMainModuleColor(chargeFullParticleSystem, palette.iconColor);
             SetMainModuleColor(neutralDashParticleSystem, palette.iconColor);
             SetMainModuleColor(superDashParticleSystem, palette.superDashStartColor);
             SetMainModuleColor(burstDashParticleSystem, palette.burstDashStartColor);
             SetMainModuleColor(koParticleSystem, palette.iconColor);
 
-            koParticleSystem.GetComponent<ParticleSystemRenderer>().sharedMaterial = palette.iconMaterial;
+            Debug.Log(palette.iconMaterial);
+            koParticleSystem.GetComponent<ParticleSystemRenderer>().material = palette.iconMaterial;
         }
 
         scoreUI = playerManager.GetScoreUI(i);
@@ -964,6 +1047,14 @@ public class ShipState : MonoBehaviour
     public Color GetMainColor()
     {
         return sprite.color;
+    }
+
+    public void RestartParticleSystemAtMe(ParticleSystem system)
+    {
+        system.gameObject.transform.position = transform.position;
+        system.gameObject.transform.rotation = transform.rotation;
+        system.time = 0;
+        system.Play();
     }
 
     public void StopComboTrail()

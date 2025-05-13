@@ -131,7 +131,6 @@ public class PlayerManager : MonoBehaviour
             return false;
 
         shipControllers[index].GetComponent<ShipController>().SetDevice(device);
-        Debug.Log("Player manager setting controller " + index + " to device " + device);
         return true;
     }
 
@@ -168,7 +167,6 @@ public class PlayerManager : MonoBehaviour
 
     public void AddScoresToLeaderboard()
     {
-        // TODO: Players who tie should have same rank
         GameObject ranks = GameObject.Find("Ranks");
         GameObject leaderboard = GameObject.Find("Battle Leaderboard");
 
