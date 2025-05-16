@@ -85,12 +85,12 @@ public class PlayerSetupInfoSingle : MonoBehaviour
         {
             case PlayerSetupManager.GameMode.ScoreAttack:
                 playerSetupManager.StartingGame(true);
-                SceneManager.LoadScene("ScoreAttack_Main");
+                SceneManager.LoadScene("ScoreAttack_Tutorial");
                 playerSetupManager.GetComponent<PlayerInputManager>().DisableJoining();
                 break;
             case PlayerSetupManager.GameMode.ArenaBattle:
                 playerSetupManager.StartingGame(true);
-                SceneManager.LoadScene("ArenaBattle_Main");
+                SceneManager.LoadScene("ArenaBattle_Tutorial");
                 playerSetupManager.GetComponent<PlayerInputManager>().DisableJoining();
                 break;
             default:

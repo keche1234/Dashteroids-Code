@@ -27,7 +27,6 @@ public class PlayerManager : MonoBehaviour
 
     protected PlayerSetupManager playerSetupManager;
     protected PlayerInputManager playerInputManager;
-    protected int nextPlayer; // When a ship is created, it gets this value;
 
     protected List<GameObject> players;
 
@@ -118,13 +117,6 @@ public class PlayerManager : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        // Debug
-        //StartGame();
-    }
-
     public bool SetDeviceForController(int index, InputDevice device)
     {
         if (index < 0 || index >= shipControllers.Length)
@@ -132,11 +124,6 @@ public class PlayerManager : MonoBehaviour
 
         shipControllers[index].GetComponent<ShipController>().SetDevice(device);
         return true;
-    }
-
-    public int GetNextPlayer()
-    {
-        return nextPlayer;
     }
 
     public void SetPlayerMaps(string map)
@@ -157,6 +144,12 @@ public class PlayerManager : MonoBehaviour
 
     public BattleScoreUI GetScoreUI(int i)
     {
+        if (playerScores == null)
+        {
+            Debug.LogWarning("No player scores found!");
+            return null;
+        }
+
         if (i < 0 || i >= playerScores.Count)
         {
             Debug.LogWarning("Requested Player Score UI " + i + " is out of range [0," + "," + playerScores.Count + ")!");

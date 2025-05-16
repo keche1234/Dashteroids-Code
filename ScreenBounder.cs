@@ -4,12 +4,6 @@ public class ScreenBounder : MonoBehaviour
 {
     [SerializeField] protected float margin;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-
-    }
-
     // Update is called once per frame
     void Update()
     {
@@ -49,5 +43,10 @@ public class ScreenBounder : MonoBehaviour
 
         //assign it to the transform
         transform.position = newPosition;
+    }
+
+    public float GetMargin()
+    {
+        return margin;
     }
 }

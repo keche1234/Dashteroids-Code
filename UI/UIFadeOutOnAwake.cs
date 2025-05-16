@@ -12,7 +12,6 @@ public class UIFadeOutOnAwake : MonoBehaviour
     void Awake()
     {
         graphic = GetComponent<Graphic>();
-        Debug.Log(graphic.GetType());
         StartCoroutine(FadeOut());
     }
 

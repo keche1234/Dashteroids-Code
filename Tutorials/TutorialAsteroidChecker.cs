@@ -4,11 +4,13 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using static UnityEngine.InputSystem.InputAction;
 
 public class TutorialAsteroidChecker : MonoBehaviour
 {
     [SerializeField] protected TextMeshProUGUI startMessage;
     [SerializeField] protected GameObject pauseMenuToDestroy; // need to destroy upon starting the game
+    [SerializeField] protected string nextScene;
     protected int tutorialAsteroidsDestroyed;
     protected Dictionary<TutorialAsteroidSpawner, bool> tutorialSpawners; // true <=> asteroid has been destroyed
 
@@ -71,6 +73,11 @@ public class TutorialAsteroidChecker : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    public void StartGame(CallbackContext callback)
+    {
+        StartGame(nextScene);
     }
 
     public void StartGame(string scene)

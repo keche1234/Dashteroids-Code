@@ -9,37 +9,55 @@ public class TutorialAsteroidSpawner : MonoBehaviour
     [SerializeField] protected float spaceNeeded; // will not spawn an asteroid unless the player is this far away from the spawn point
     [SerializeField] protected GameObject myShip;
     [SerializeField] protected TutorialAsteroidChecker checker;
+
     protected ObjectPool pool;
     protected Asteroid currentAsteroid;
+
     protected Coroutine spawningCoroutine = null;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    [SerializeField] protected bool pauseSpawning;
     void Awake()
     {
         pool = GameObject.Find("Asteroid Pool").GetComponent<ObjectPool>();
-        checker.AddSpawner(this);
+        if (checker)
+            checker.AddSpawner(this);
         SpawnAsteroidAtPositionIndex(0);
     }
 
     // Update is called once per frame
     void Update()
     {
-        // I have an asteroid, no spawn coroutine
-        if (currentAsteroid)
+        if (!pauseSpawning)
         {
-            spawningCoroutine = null;
-            if (!currentAsteroid.gameObject.activeSelf) // ...but the asteroid was "destroyed"
+            // I have an asteroid, there should be no spawn coroutine running
+            if (currentAsteroid)
+            {
+                spawningCoroutine = null;
+                if (!currentAsteroid.gameObject.activeSelf) // ...but the asteroid was "destroyed"
+                {
+                    currentAsteroid = null;
+                    checker?.AsteroidDestroyed(this);
+                }
+            }
+
+            // No asteroid, or the asteroid was destroyed, and I haven't started spawning yet
+            if ((!currentAsteroid || !currentAsteroid.gameObject.activeSelf) && spawningCoroutine == null)
             {
                 currentAsteroid = null;
-                checker?.AsteroidDestroyed(this);
+                spawningCoroutine = StartCoroutine(AsteroidDelayCoroutine());
             }
         }
+    }
 
-        // No asteroid, or the asteroid was destroyed, and I haven't started spawning yet
-        if ((!currentAsteroid || !currentAsteroid.gameObject.activeSelf) && spawningCoroutine == null)
-        {
-            currentAsteroid = null;
-            spawningCoroutine = StartCoroutine(SpawnAsteroidWithDelay());
-        }
+    public void SetChecker(TutorialAsteroidChecker c)
+    {
+        checker?.RemoveSpawner(this);
+        checker = c;
+        checker?.AddSpawner(this);
+    }
+
+    public void SetShip(GameObject ship)
+    {
+        myShip = ship;
     }
 
     // Adds positions that the spawner could spawn an asteroid
@@ -50,25 +68,24 @@ public class TutorialAsteroidSpawner : MonoBehaviour
         asteroidSpawnPositions.Add(spawnPosition);
     }
 
-    public void SetChecker(TutorialAsteroidChecker c)
-    {
-        checker?.RemoveSpawner(this);
-        checker = c;
-        checker?.AddSpawner(this);
-    }
-
     public void SpawnAsteroidAtPositionIndex(int i)
     {
         if (asteroidSpawnPositions == null || asteroidSpawnPositions.Count <= 0 || myShip == null)
             return;
+        Debug.Log("Have a list and ship");
 
         if (i < 0 || i >= asteroidSpawnPositions.Count)
             return;
+        Debug.Log("In bounds");
 
         Vector3 position = asteroidSpawnPositions[i];
         if (myShip.transform.position == position || (myShip.transform.position - position).magnitude < spaceNeeded)
+        //return;
+        {
+            Debug.Log((myShip.transform.position == position) + " and " + ((myShip.transform.position - position).magnitude < spaceNeeded));
             return;
-
+        }
+        Debug.Log("About to spawn at position " + i);
         SpawnAsteroidAtPosition(position);
     }
 
@@ -84,11 +101,11 @@ public class TutorialAsteroidSpawner : MonoBehaviour
         SpawnAsteroidAtPosition(position);
     }
 
-    private void SpawnAsteroidAtPosition(Vector3 position)
+    protected void SpawnAsteroidAtPosition(Vector3 position)
     {
         GameObject asteroid;
-
         asteroid = pool.GetPooledObject();
+        Debug.Log("Got object " + asteroid);
         if (asteroid == null)
             return;
 
@@ -104,8 +121,21 @@ public class TutorialAsteroidSpawner : MonoBehaviour
         asteroidRb.angularVelocity = 180f;
     }
 
-    // Spawns an asteroid
-    public IEnumerator SpawnAsteroidWithDelay()
+    public void SetSpawnDelay(float t)
+    {
+        spawnDelay = t;
+    }
+
+    public bool SpawnAsteroidWithDelay()
+    {
+        if (spawningCoroutine != null)
+            return false;
+        spawningCoroutine = StartCoroutine(AsteroidDelayCoroutine());
+        return true;
+    }
+
+    // Spawns an asteroid with this script's delay
+    protected IEnumerator AsteroidDelayCoroutine()
     {
         if (asteroidSpawnPositions == null || asteroidSpawnPositions.Count <= 0 || myShip == null)
             yield return null;
@@ -142,6 +172,16 @@ public class TutorialAsteroidSpawner : MonoBehaviour
 
             yield return null;
         }
+    }
+
+    public void PauseSpawning()
+    {
+        pauseSpawning = true;
+    }
+
+    public void ResumeSpawning()
+    {
+        pauseSpawning = false;
     }
 
     public void OnDisable()

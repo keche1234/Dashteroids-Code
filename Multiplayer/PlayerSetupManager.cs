@@ -39,11 +39,11 @@ public class PlayerSetupManager : MonoBehaviour
             playerDevices = new Dictionary<int, InputDevice>();
 
         inputActions = new DashteroidsActions();
-        inputActions.UI.Enable();
     }
 
     private void OnEnable()
     {
+        inputActions.UI.Enable();
         startMessage = GameObject.Find("Game State Canvas").transform.GetChild(1).gameObject;
     }
 

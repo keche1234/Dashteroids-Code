@@ -23,10 +23,10 @@ public class ShipState : MonoBehaviour
     //private int currentLives;
     private float respawnTimer;
     private float invincTimer;
-    private float burstMercyInvincMod = 1.5f;
+    private float burstMercyInvincMod = 1.1f;
     private float burstMercyInvincTimer;
-    protected Vector3 respawnPosition = Vector3.zero;
-    protected Vector3 respawnLookVector = Vector3.up;
+    [SerializeField] protected Vector3 respawnPosition = Vector3.zero;
+    [SerializeField] protected Vector3 respawnLookVector = Vector3.up;
 
     private bool alive = true;
 
@@ -412,14 +412,46 @@ public class ShipState : MonoBehaviour
         }
     }
 
+    /*
+     * Returns the position of the ship vertex that is closest to a given point
+     * using barycentric coordinates
+     */
+    protected Vector2 ClosestVertexToPoint(Vector2 point)
+    {
+        Vector2 localPoint = point - (Vector2)transform.position;
+
+        Vector2 x = (-transform.right * (transform.localScale.x / 2)) - (transform.up * (transform.localScale.y / 2)); // Left
+        Vector2 y = (transform.right * (transform.localScale.x / 2)) - (transform.up * (transform.localScale.y / 2)); // Right
+        Vector2 z = transform.up * transform.localScale.y / 2; // Top
+
+        float a = Vector3.Cross(localPoint - y, localPoint - z).z / 2;
+        float b = Vector3.Cross(localPoint - z, localPoint - x).z / 2;
+        float c = Vector3.Cross(localPoint - x, localPoint - y).z / 2;
+
+        float max = Mathf.Max(Mathf.Max(a, b), c);
+
+        if (max == a)
+        {
+            Debug.Log("Left");
+            return x + (Vector2)transform.position;
+        }
+        if (max == b)
+        {
+            Debug.Log("Right");
+            return y + (Vector2)transform.position;
+        }
+        Debug.Log("Top");
+        return z + (Vector2)transform.position;
+    }
+
     public void OnTriggerEnter2D(Collider2D collision)
     {
+        GameObject target;
+        Asteroid asteroid;
+        ShipState opponent;
+
         if (!timeManager.GetTimeUp())
         {
-            GameObject target;
-            Asteroid asteroid;
-            ShipState opponent;
-
             if ((target = collision.gameObject) && (asteroid = target.GetComponent<Asteroid>()))
             {
                 if (alive)
@@ -474,7 +506,7 @@ public class ShipState : MonoBehaviour
                     else
                     {
                         Explode();
-                        if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle)
+                        if (gameManager.GetGameMode() == GameManager.GameMode.ArenaBattle && !gameManager.InTutorialMode())
                         {
                             if (lastHitMe)
                             {
@@ -598,6 +630,45 @@ public class ShipState : MonoBehaviour
         }
     }
 
+    public void OnTriggerStay2D(Collider2D collision)
+    {
+        GameObject target;
+        Wall wall;
+
+        if ((target = collision.gameObject) && (wall = target.GetComponent<Wall>()))
+        {
+            // Calculate the normal for collision, and the max distance you can travel
+            // along that normal from center to wall
+            Vector2 normal = wall.CalculateCollisionNormal(transform.position);
+            float maxDistance = wall.MaxDistanceAlongNormal(normal);
+
+            // Calculate distance along normal that the ship center should be
+            // (maxDistance + bound margin)
+            float margin = GetComponent<ScreenBounder>().GetMargin();
+            float boundMargin = Mathf.Max(Vector3.Project(transform.right, normal).magnitude,
+                                          Vector3.Project(transform.up, normal).magnitude) * margin / 2;
+            float distanceNeededFromCenter = maxDistance + boundMargin;
+            Debug.Log(maxDistance);
+            Debug.DrawRay(wall.transform.position, normal * distanceNeededFromCenter, Color.red, 2f);
+
+            // How far is the ship along the normal right now?
+            float currentDistance = Vector3.Project(transform.position - wall.transform.position, normal).magnitude;
+            float strength = distanceNeededFromCenter - currentDistance;
+            transform.position += strength * (Vector3)normal;
+
+            //// Then calculate the point deepest in the wall, and do vector subtraction
+            //// to calculate how deep in the wall (magnitude)
+            //Vector2 deepestPoint = ClosestVertexToPoint(wall.transform.position - ((Vector3)normal * maxDistance));
+            //Vector2 centerToDeep = Vector3.Project((Vector3)deepestPoint - wall.transform.position, normal);
+            //float depth = (centerToEdge - centerToDeep).magnitude;
+            //Debug.DrawRay(deepestPoint, centerToDeep, Color.red, 2f);
+            //Debug.DrawRay(wall.transform.position, centerToEdge, Color.blue, 2f);
+
+            //// Push ship back along normal this distance
+            //transform.position += (Vector3)normal * depth;
+        }
+    }
+
     private void SuperDashCombo(float extraBurst)
     {
         StartSuperDash(shipControl.GetComboDuration());
@@ -666,7 +737,10 @@ public class ShipState : MonoBehaviour
             sprite.color = chargeReadyBaseColor;
         }
 
-        // Play sound
+        shipSound.charge.Stop();
+        shipSound.chargeReady.Stop();
+
+        // Play destroy sound
         shipSound.playerDestroyed.Play();
     }
 
@@ -761,8 +835,6 @@ public class ShipState : MonoBehaviour
         Vector3 pivotPosition = transform.position + (transform.right * pivotOffsetGlobal.x) + (transform.up * pivotOffsetGlobal.y) + (transform.forward * pivotOffsetGlobal.z);
 
         Vector3 pivotToCenterVector = (transform.position - pivotPosition).normalized;
-
-        Debug.DrawRay(pivotPosition, pivotToCenterVector, Color.blue);
 
         transform.localPosition += Vector3.Project(pivotToCenterVector, transform.right) * scale.x * baseSize.x;
         transform.localPosition += Vector3.Project(pivotToCenterVector, transform.up) * scale.y * baseSize.y;
@@ -1030,12 +1102,11 @@ public class ShipState : MonoBehaviour
             SetMainModuleColor(burstDashParticleSystem, palette.burstDashStartColor);
             SetMainModuleColor(koParticleSystem, palette.iconColor);
 
-            Debug.Log(palette.iconMaterial);
             koParticleSystem.GetComponent<ParticleSystemRenderer>().material = palette.iconMaterial;
         }
 
         scoreUI = playerManager.GetScoreUI(i);
-        scoreUI?.gameObject.SetActive(true);
+        scoreUI?.gameObject.SetActive(!gameManager.InTutorialMode());
     }
 
     protected void SetMainModuleColor(ParticleSystem module, Color color)

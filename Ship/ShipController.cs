@@ -160,6 +160,7 @@ public class ShipController : MonoBehaviour
                 {
                     chargeTimer = 0;
                 }
+
                 if (playerInput.actions.FindAction("Start").WasPerformedThisFrame())
                 {
                     PauseGame();
@@ -176,6 +177,8 @@ public class ShipController : MonoBehaviour
                 break;
             case GameManager.GameState.Results:
                 playerInput.SwitchCurrentActionMap("UI");
+                shipSound.charge.Stop();
+                shipSound.chargeReady.Stop();
                 break;
         }
     }
@@ -268,7 +271,7 @@ public class ShipController : MonoBehaviour
     protected void SuperDashUpdate()
     {
         RotateShip();
-        if (playerInput.actions.FindAction("Dash").WasPerformedThisFrame())
+        if (playerInput.actions.FindAction("Burst").WasPerformedThisFrame())
         {
             shipState.StartBurstDash(burstDuration);
             shipSound.superDashSustain.Stop();
@@ -284,7 +287,7 @@ public class ShipController : MonoBehaviour
     protected void BurstDashUpdate()
     {
         RotateShip(0.2f);
-        if (playerInput.actions.FindAction("Dash").WasPerformedThisFrame() && shipState.CanBurstAgain())
+        if (playerInput.actions.FindAction("Burst").WasPerformedThisFrame() && shipState.CanBurstAgain())
             shipState.StartBurstDash(burstDuration);
         playerRb.linearVelocity = transform.up * burstSpeed;
     }

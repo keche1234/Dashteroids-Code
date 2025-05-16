@@ -101,12 +101,17 @@ public class GameManager : MonoBehaviour
 
     protected IEnumerator StartGameCoroutine()
     {
+        
+
         // Turn off screen fade
         for (float t = 0; t < transitionFadeTime; t += Time.unscaledDeltaTime)
         {
             screenWhite.color = new Color(1, 1, 1, 1f - (t / transitionFadeTime));
             yield return null;
         }
+
+        if (!musicLooper.enabled)
+            musicLooper.enabled = true;
         // Set state to countdown
         gameState = GameState.Countdown;
         yield return null;
@@ -127,8 +132,6 @@ public class GameManager : MonoBehaviour
         playerManager?.SetPlayerMaps("Player");
 
         // Show "DASH!" for 1 second
-        if (!musicLooper.enabled)
-            musicLooper.enabled = true;
         for (float t = 0; t < 1; t += Time.unscaledDeltaTime)
         {
             countdownNumber.text = "DASH!!";
@@ -191,10 +194,8 @@ public class GameManager : MonoBehaviour
 
     public void UnpauseGame()
     {
-        Debug.Log("Unpausing");
         EventSystem.current.SetSelectedGameObject(null);
-        if (gameMode == GameMode.ArenaBattle)
-            PlayerUISelectAll(null);
+        PlayerUISelectAll(null);
 
         StartGame();
         soloPlayer?.SwitchCurrentActionMap("Player");
@@ -226,12 +227,14 @@ public class GameManager : MonoBehaviour
 
     public void PlayerUISelectAll(GameObject select)
     {
-        Debug.Log("erm");
-        List<GameObject> players = playerManager.GetPlayers();
-        foreach (GameObject player in players)
+        if (gameMode == GameMode.ArenaBattle)
         {
-            player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(null);
-            player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(select);
+            List<GameObject> players = playerManager.GetPlayers();
+            foreach (GameObject player in players)
+            {
+                player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(null);
+                player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(select);
+            }
         }
     }
 
