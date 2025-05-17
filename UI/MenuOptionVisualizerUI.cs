@@ -41,9 +41,7 @@ public class MenuOptionVisualizerUI : MonoBehaviour
     public void OnDeselect()
     {
         if (!submitted)
-        {
             text.color = regularColor;
-        }
         submitted = false;
     }
 

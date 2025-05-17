@@ -36,6 +36,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] protected GameObject continueButton;
     [SerializeField] protected bool countdownOnGameStart = true;
 
+    [Header("Visual Elements - Pause (Multiplayer)")]
+    [SerializeField] protected GameObject menuEmpty; // when mouse leaves, select this
+    [SerializeField] protected GameObject menuHowToPlayEmpty; // when selecting How To Play, select this
+
     [Header("Visual Elements - Countdown")]
     [SerializeField] protected TextMeshProUGUI countdownNumber;
 
@@ -101,8 +105,6 @@ public class GameManager : MonoBehaviour
 
     protected IEnumerator StartGameCoroutine()
     {
-        
-
         // Turn off screen fade
         for (float t = 0; t < transitionFadeTime; t += Time.unscaledDeltaTime)
         {
@@ -153,6 +155,8 @@ public class GameManager : MonoBehaviour
     public void ShowTutorial()
     {
         PlayerUISelectAll(null);
+        if (gameMode == GameMode.ArenaBattle)
+            RemovePointerEventsMultiplayer();
         gameState = GameState.Tutorial;
         tutorialManager.ShowTutorial();
     }
@@ -171,13 +175,54 @@ public class GameManager : MonoBehaviour
                 case GameMode.ArenaBattle:
                     if (player)
                     {
-                        player.GetComponent<MultiplayerEventSystem>().SetSelectedGameObject(continueButton);
-                        foreach (MenuOptionVisualizerUI option in pauseMenu.GetComponentsInChildren<MenuOptionVisualizerUI>())
+                        MultiplayerEventSystem playerEventSystem = player.GetComponent<MultiplayerEventSystem>();
+                        playerEventSystem.SetSelectedGameObject(continueButton);
+                        foreach (Button option in pauseMenu.GetComponentsInChildren<Button>())
                         {
                             //option.SetSelectColor(player.GetMainColor());
-                            option.OnDeselect();
+                            option.gameObject.GetComponent<MenuOptionVisualizerUI>().OnDeselect();
+                            // Add event triggers for multiplayer
+                            EventTrigger eventTrigger = option.gameObject.GetComponent<EventTrigger>();
+                            if (eventTrigger && player.gameObject.GetComponent<PlayerInput>().currentControlScheme == "Keyboard&Mouse")
+                            {
+                                EventTrigger.Entry enterEntry = new();
+                                EventTrigger.Entry exitEntry = new();
+                                EventTrigger.Entry clickEntry = new();
+
+                                // Pointer Enter
+                                enterEntry.eventID = EventTriggerType.PointerEnter;
+                                enterEntry.callback.AddListener(data => { option.GetComponent<MenuOptionVisualizerUI>().OnSelect(); });
+                                enterEntry.callback.AddListener(data => { playerEventSystem.SetSelectedGameObject(option.gameObject); });
+                                eventTrigger.triggers.Add(enterEntry);
+
+                                // Pointer Exit
+                                exitEntry.eventID = EventTriggerType.PointerExit;
+                                exitEntry.callback.AddListener(data => { option.GetComponent<MenuOptionVisualizerUI>().OnDeselect(); });
+                                exitEntry.callback.AddListener(data => { playerEventSystem.SetSelectedGameObject(menuEmpty); });
+                                eventTrigger.triggers.Add(exitEntry);
+
+                                // Pointer Click
+                                clickEntry.eventID = EventTriggerType.PointerClick;
+                                //clickEntry.callback.AddListener(data => { option.GetComponent<MenuOptionVisualizerUI>().OnSubmit(); });
+                                clickEntry.callback.AddListener(data => { playerEventSystem.SetSelectedGameObject(menuHowToPlayEmpty); });
+
+                                // Want pointer click to do the same thing as Submit,
+                                // so first need to copy the entries of the Submit Event
+                                List<EventTrigger.Entry> submissionEntries =
+                                    eventTrigger.triggers.FindAll((EventTrigger.Entry entry) => { return entry.eventID == EventTriggerType.Submit; });
+                                foreach (EventTrigger.Entry entry in submissionEntries)
+                                {
+                                    // Then, for each entry, invoke the same events
+                                    EventTrigger.Entry entryCopy = new();
+                                    entryCopy.eventID = EventTriggerType.PointerClick;
+                                    entryCopy.callback.AddListener(data => entry.callback.Invoke(data));
+                                    eventTrigger.triggers.Add(entryCopy);
+                                }
+                                eventTrigger.triggers.Add(clickEntry);
+                            }
+                            //option.GetComponent<EventTrigger>().triggers.Add()
                         }
-                        pauseTitle.color = player.GetMainColor();
+                        pauseTitle.color = player.GetSecondaryColor();
                     }
                     break;
             }
@@ -196,6 +241,8 @@ public class GameManager : MonoBehaviour
     {
         EventSystem.current.SetSelectedGameObject(null);
         PlayerUISelectAll(null);
+        if (gameMode == GameMode.ArenaBattle)
+            RemovePointerEventsMultiplayer();
 
         StartGame();
         soloPlayer?.SwitchCurrentActionMap("Player");
@@ -234,6 +281,24 @@ public class GameManager : MonoBehaviour
             {
                 player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(null);
                 player.GetComponent<MultiplayerEventSystem>()?.SetSelectedGameObject(select);
+            }
+        }
+    }
+
+    public void RemovePointerEventsMultiplayer()
+    {
+        List<GameObject> players = playerManager.GetPlayers();
+        foreach (Button option in pauseMenu.GetComponentsInChildren<Button>())
+        {
+            EventTrigger eventTrigger = option.GetComponent<EventTrigger>();
+            if (eventTrigger)
+            {
+                foreach (GameObject player in players)
+                {
+                    eventTrigger.triggers.RemoveAll((EventTrigger.Entry entry) => { return entry.eventID == EventTriggerType.PointerEnter; });
+                    eventTrigger.triggers.RemoveAll((EventTrigger.Entry entry) => { return entry.eventID == EventTriggerType.PointerExit; });
+                    eventTrigger.triggers.RemoveAll((EventTrigger.Entry entry) => { return entry.eventID == EventTriggerType.PointerClick; });
+                }
             }
         }
     }

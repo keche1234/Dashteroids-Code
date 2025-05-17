@@ -8,7 +8,6 @@ public class MenuManager : MonoBehaviour
     [SerializeField] protected GameObject firstOption;
     protected Stack<GameObject> prevOptionStack;
     protected Stack<SubMenu> subMenuStack;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
         EventSystem.current.SetSelectedGameObject(firstOption);
@@ -42,7 +41,6 @@ public class MenuManager : MonoBehaviour
 
     public void CloseSubMenu()
     {
-        Debug.Log("Closing");
         subMenuStack.Pop().gameObject.SetActive(false);
         if (subMenuStack.Count > 0)
             subMenuStack.Peek().gameObject.SetActive(true);

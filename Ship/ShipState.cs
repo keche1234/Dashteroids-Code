@@ -174,7 +174,10 @@ public class ShipState : MonoBehaviour
 
         ScoreManager[] sm = FindObjectsByType<ScoreManager>(FindObjectsSortMode.None);
         if (sm == null || sm.Length < 1)
-            Debug.LogWarning("No score manager found in scene!");
+        {
+            if (gameManager.GetGameMode() == GameManager.GameMode.ScoreAttack)
+                Debug.LogWarning("No score manager found in scene!");
+        }
         else
             scoreManager = sm[0];
 
@@ -648,8 +651,6 @@ public class ShipState : MonoBehaviour
             float boundMargin = Mathf.Max(Vector3.Project(transform.right, normal).magnitude,
                                           Vector3.Project(transform.up, normal).magnitude) * margin / 2;
             float distanceNeededFromCenter = maxDistance + boundMargin;
-            Debug.Log(maxDistance);
-            Debug.DrawRay(wall.transform.position, normal * distanceNeededFromCenter, Color.red, 2f);
 
             // How far is the ship along the normal right now?
             float currentDistance = Vector3.Project(transform.position - wall.transform.position, normal).magnitude;
@@ -1105,8 +1106,11 @@ public class ShipState : MonoBehaviour
             koParticleSystem.GetComponent<ParticleSystemRenderer>().material = palette.iconMaterial;
         }
 
-        scoreUI = playerManager.GetScoreUI(i);
-        scoreUI?.gameObject.SetActive(!gameManager.InTutorialMode());
+        if (!gameManager.InTutorialMode())
+        {
+            scoreUI = playerManager.GetScoreUI(i);
+            scoreUI?.gameObject.SetActive(!gameManager.InTutorialMode());
+        }
     }
 
     protected void SetMainModuleColor(ParticleSystem module, Color color)
@@ -1117,6 +1121,13 @@ public class ShipState : MonoBehaviour
 
     public Color GetMainColor()
     {
+        return sprite.color;
+    }
+
+    public Color GetSecondaryColor()
+    {
+        if (multiplayerIcon)
+            return multiplayerIcon.color;
         return sprite.color;
     }
 

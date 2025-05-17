@@ -46,11 +46,15 @@ public class PlayerSetupManager : MonoBehaviour
         inputActions.UI.Enable();
         startMessage = GameObject.Find("Game State Canvas").transform.GetChild(1).gameObject;
     }
+    public void OnDisable()
+    {
+        inputActions.UI.Disable();
+    }
 
     // Update is called once per frame
     void Update()
     {
-        if (inputActions.FindAction("Cancel").IsPressed())
+        if (inputActions.FindAction("Leave").IsPressed())
         {
             if (quitTimer <= 0)
             {
@@ -144,10 +148,7 @@ public class PlayerSetupManager : MonoBehaviour
         return playerPalettes[i];
     }
 
-    public void OnDisable()
-    {
-        inputActions.UI.Disable();
-    }
+    
 
     public GameMode GetGameMode()
     {

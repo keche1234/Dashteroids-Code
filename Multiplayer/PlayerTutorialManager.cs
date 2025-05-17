@@ -58,13 +58,13 @@ public class PlayerTutorialManager : PlayerManager
                 // 1) Set Player Position (evenly spread out horizontaly)
                 Vector2 position = new((-screenWidthWorld / 2) +  (screenWidthWorld * ((2 * j) + 1) / (2 * joinedPlayerCount)), 0);
                 shipObj.transform.SetPositionAndRotation(position, Quaternion.LookRotation(Vector3.forward, Vector3.up));
-                shipState.SetRespawnPosition(shipObj.transform.position);
+                shipState.SetRespawnPosition(shipObj.transform.position - (Vector3.up * 0.5f));
                 shipState.SetRespawnLookVector(Vector3.up);
 
                 // 2) Create TutorialAsteroidSpawner and set asteroid positions
                 TutorialAsteroidSpawner spawner = Instantiate(asteroidSpawnerPrefab);
                 spawner.SetShip(shipObj);
-                spawner.AddSpawnPosition(shipObj.transform.position + (Vector3.up * 2));
+                spawner.AddSpawnPosition(shipObj.transform.position + (Vector3.up * 3));
                 spawner.SetChecker(tutorialAsteroidChecker);
                 spawner.SpawnAsteroidAtPositionIndex(0);
                 spawner.ResumeSpawning();

@@ -116,7 +116,7 @@ public class ShipController : MonoBehaviour
         switch (gameManager.GetGameState())
         {
             case GameManager.GameState.Tutorial:
-                if (playerInput.actions.FindAction("Submit").WasPressedThisFrame() && !gameManager.GetTutorialManager().JustShowedTutorial())
+                if (playerInput.actions.FindAction("Dash").WasPressedThisFrame() && !gameManager.GetTutorialManager().JustShowedTutorial())
                 {
                     tutorialConfirm.Confirm(shipState.GetMainColor());
                     playerInput.SwitchCurrentActionMap("Player");

@@ -72,20 +72,13 @@ public class TutorialAsteroidSpawner : MonoBehaviour
     {
         if (asteroidSpawnPositions == null || asteroidSpawnPositions.Count <= 0 || myShip == null)
             return;
-        Debug.Log("Have a list and ship");
 
         if (i < 0 || i >= asteroidSpawnPositions.Count)
             return;
-        Debug.Log("In bounds");
 
         Vector3 position = asteroidSpawnPositions[i];
         if (myShip.transform.position == position || (myShip.transform.position - position).magnitude < spaceNeeded)
-        //return;
-        {
-            Debug.Log((myShip.transform.position == position) + " and " + ((myShip.transform.position - position).magnitude < spaceNeeded));
             return;
-        }
-        Debug.Log("About to spawn at position " + i);
         SpawnAsteroidAtPosition(position);
     }
 
@@ -105,7 +98,6 @@ public class TutorialAsteroidSpawner : MonoBehaviour
     {
         GameObject asteroid;
         asteroid = pool.GetPooledObject();
-        Debug.Log("Got object " + asteroid);
         if (asteroid == null)
             return;
 
